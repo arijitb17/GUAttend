@@ -149,58 +149,73 @@ export default function TeacherAttendance() {
   }
 
   async function fetchCourseStudents(courseId: string) {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/teacher/courses/${courseId}/students`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  setLoading(true);
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`/api/teacher/courses/${courseId}/students`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      if (res.ok) {
-        const studentsData: Student[] = await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      
+      // API returns { course, students } - extract the students array
+      const studentsData: Student[] = data.students || [];
+      
+      console.log('Fetched students data:', studentsData);
+      
+      // Validate that we have an array
+      if (!Array.isArray(studentsData)) {
+        console.error('Invalid students data format:', data);
+        alert("Error: Invalid data format received from server");
+        setLoading(false);
+        return;
+      }
 
-        // Check photos for each student
-        const updatedStudents = await Promise.all(
-          studentsData.map(async (student) => {
-            try {
-              const photoRes = await fetch(
-                `/api/student/check-photos?studentId=${student.id}`,
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-
-              if (photoRes.ok) {
-                const photoData = await photoRes.json();
-                return {
-                  ...student,
-                  hasPhotos: photoData.hasPhotos,
-                  photoCount: photoData.photoCount,
-                };
-              } else {
-                return { ...student, hasPhotos: false, photoCount: 0 };
+      // Check photos for each student
+      const updatedStudents = await Promise.all(
+        studentsData.map(async (student) => {
+          try {
+            const photoRes = await fetch(
+              `/api/student/check-photos?studentId=${student.id}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
               }
-            } catch (err) {
-              console.error(`Photo check failed for ${student.id}:`, err);
+            );
+
+            if (photoRes.ok) {
+              const photoData = await photoRes.json();
+              return {
+                ...student,
+                hasPhotos: photoData.hasPhotos,
+                photoCount: photoData.photoCount,
+              };
+            } else {
               return { ...student, hasPhotos: false, photoCount: 0 };
             }
-          })
-        );
+          } catch (err) {
+            console.error(`Photo check failed for ${student.id}:`, err);
+            return { ...student, hasPhotos: false, photoCount: 0 };
+          }
+        })
+      );
 
-        setStudents(updatedStudents);
-        setCurrentView("students");
-      } else {
-        alert("Failed to fetch students");
-      }
-    } catch (error) {
-      console.error("Failed to fetch students:", error);
-      alert("Error fetching students");
-    } finally {
-      setLoading(false);
+      setStudents(updatedStudents);
+      setCurrentView("students");
+    } else {
+      const errorData = await res.json().catch(() => ({}));
+      console.error('Failed to fetch students:', errorData);
+      alert("Failed to fetch students: " + (errorData.error || res.statusText));
     }
+  } catch (error) {
+    console.error("Failed to fetch students:", error);
+    alert("Error fetching students: " + (error instanceof Error ? error.message : 'Unknown error'));
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleCourseSelect(course: Course) {
     setSelectedCourse(course);

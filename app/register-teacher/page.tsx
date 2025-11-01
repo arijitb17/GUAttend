@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function TeacherRegister() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const router = useRouter();
 
@@ -33,7 +35,7 @@ export default function TeacherRegister() {
       {/* --- University Logo & Header --- */}
       <div className="flex flex-col items-center mb-8 text-center">
         <Image
-          src="/logo.png" 
+          src="/logo.png"
           alt="Gauhati University Logo"
           width={100}
           height={100}
@@ -68,13 +70,22 @@ export default function TeacherRegister() {
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full p-3 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          {/* --- Password Field with Eye Icon --- */}
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="w-full p-3 pr-10 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 cursor-pointer text-gray-400 hover:text-white transition"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </span>
+          </div>
 
           <button
             onClick={handleRegister}

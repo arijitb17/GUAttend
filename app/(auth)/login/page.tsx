@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   async function handleLogin() {
@@ -32,7 +34,7 @@ export default function LoginPage() {
       {/* --- University Logo --- */}
       <div className="flex flex-col items-center mb-8 text-center">
         <Image
-          src="/logo.png" // 🧩 place your logo in public/gu-logo.png
+          src="/logo.png"
           alt="Gauhati University Logo"
           width={100}
           height={100}
@@ -51,6 +53,7 @@ export default function LoginPage() {
         </h2>
 
         <div className="space-y-4">
+          {/* Email Input */}
           <input
             type="email"
             placeholder="Email"
@@ -59,14 +62,24 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full p-3 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          {/* Password Input with Eye Icon */}
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="w-full p-3 pr-10 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer select-none"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </span>
+          </div>
 
+          {/* Login Button */}
           <button
             onClick={handleLogin}
             className="w-full bg-white text-black font-semibold p-3 rounded-lg hover:bg-gray-200 transition-all duration-200 cursor-pointer"
@@ -88,7 +101,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 rounded-2xl border border-white/10 pointer-events-none" />
       </div>
 
-      {/* --- Footer Text --- */}
+      {/* --- Footer --- */}
       <p className="text-gray-500 text-xs mt-8">
         © {new Date().getFullYear()} Gauhati University • All Rights Reserved
       </p>
