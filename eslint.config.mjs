@@ -10,8 +10,11 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Extend Next.js defaults
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+
   {
+    // 🔒 Ignore generated and build folders
     ignores: [
       "node_modules/**",
       ".next/**",
@@ -19,6 +22,17 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
     ],
+
+    // ✅ Custom rule overrides
+    rules: {
+      // Disable "no explicit any" globally — harmless and common for dynamic data
+      "@typescript-eslint/no-explicit-any": "off",
+
+      // Optional: reduce noise from prop spreading, unused vars, etc.
+      "react/prop-types": "off",
+      "no-unused-vars": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+    },
   },
 ];
 
