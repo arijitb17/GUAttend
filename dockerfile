@@ -7,44 +7,54 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-dev \
+    python3.10 python3-pip python3-dev \
     build-essential cmake g++ gcc wget git curl \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgl1-mesa-glx \
-    libgomp1 libgthread-2.0-0 ffmpeg \
+    libgomp1 libgthread-2.0-0 ffmpeg libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Upgrade pip and tools
+# Upgrade pip
 RUN pip3 install --upgrade pip setuptools wheel
 
-# Copy dependencies
-COPY requirements.txt .
-
-# ✅ Install numpy first
+# Install numpy first (critical for dependency resolution)
 RUN pip3 install numpy==1.24.3
 
-# ✅ Safe alternative to onnxruntime
-RUN pip3 install onnxruntime-openvino==1.15.1
+# Install onnxruntime separately with specific version that works on Ubuntu 22.04
+RUN pip3 install onnxruntime==1.16.3 --no-deps && \
+    pip3 install protobuf==3.20.3 flatbuffers coloredlogs sympy
 
-# Install remaining dependencies
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Copy and install remaining dependencies
+COPY requirements.txt .
 
-# Copy main app
+# Install dependencies excluding onnxruntime (already installed)
+RUN pip3 install --no-cache-dir \
+    fastapi==0.109.0 \
+    uvicorn[standard]==0.27.0 \
+    python-multipart==0.0.6 \
+    opencv-python-headless==4.9.0.80 \
+    insightface==0.7.3 \
+    scikit-learn==1.3.2 \
+    imgaug==0.4.0 \
+    Pillow==10.2.0 \
+    mediapipe==0.10.9 \
+    psycopg2-binary==2.9.9 \
+    python-dotenv==1.0.0 \
+    matplotlib==3.8.2
+
+# Copy application code
 COPY main.py .
 
-# Create required folders
+# Create required directories
 RUN mkdir -p dataset test-images output
 
 # Expose port
 EXPOSE 8000
 
-# Optional: ensure OpenVINO uses CPU backend
-ENV OPENVINO_TENSORRT_DEVICE=CPU
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000')" || exit 1
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
 
-# Start FastAPI app
+# Start FastAPI app with single worker to avoid memory issues
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
