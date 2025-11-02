@@ -23,7 +23,13 @@ app = FastAPI(title="Face Recognition API")
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://*.vercel.app",
+        "https://gu-attend.vercel.app", 
+        "*"  
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
