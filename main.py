@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 import os
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
 import pickle
 from typing import List
 import shutil
@@ -24,7 +23,7 @@ app = FastAPI(title="Face Recognition API")
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update with your Vercel domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,10 +44,20 @@ face_app = None
 face_mesh = None
 
 def get_face_app():
+    """Lazy load FaceAnalysis - only import when needed"""
     global face_app
     if face_app is None:
-        face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
-        face_app.prepare(ctx_id=0, det_size=(640, 640))
+        try:
+            # Import here to avoid startup errors
+            from insightface.app import FaceAnalysis
+            face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+            face_app.prepare(ctx_id=0, det_size=(640, 640))
+        except ImportError as e:
+            print(f"Failed to load insightface: {e}")
+            raise HTTPException(
+                status_code=500, 
+                detail="Face recognition model not available. Check onnxruntime installation."
+            )
     return face_app
 
 def get_face_mesh():
@@ -71,6 +80,15 @@ def get_db_connection():
 @app.get("/")
 async def root():
     return {"status": "Face Recognition API is running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint that doesn't require onnxruntime"""
+    return {
+        "status": "healthy",
+        "api": "running",
+        "python_version": "3.10"
+    }
 
 @app.post("/api/process-student")
 async def process_student(
@@ -124,7 +142,7 @@ async def train_faces():
         if not os.path.exists(DATASET_PATH):
             raise HTTPException(status_code=400, detail="No dataset found")
         
-        app_model = get_face_app()
+        app_model = get_face_app()  # This will now fail gracefully if onnxruntime issues
         face_dict = {}
         embedding_vectors = []
         labels = []
