@@ -24,24 +24,27 @@ COPY requirements.txt .
 # ✅ Install numpy first
 RUN pip3 install numpy==1.24.3
 
-# ✅ Replace problematic onnxruntime with safe alternative
+# ✅ Safe alternative to onnxruntime
 RUN pip3 install onnxruntime-openvino==1.15.1
 
-# Install all remaining dependencies
+# Install remaining dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy main app
 COPY main.py .
 
-# Create necessary folders
+# Create required folders
 RUN mkdir -p dataset test-images output
 
-# Expose FastAPI port
+# Expose port
 EXPOSE 8000
+
+# Optional: ensure OpenVINO uses CPU backend
+ENV OPENVINO_TENSORRT_DEVICE=CPU
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000')" || exit 1
 
-# Start the server
+# Start FastAPI app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
