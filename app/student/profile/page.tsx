@@ -1,5 +1,5 @@
 "use client"
- import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, CheckCircle, AlertCircle, User, Mail, Book, Calendar, Building, Loader } from 'lucide-react';
 
 interface Course {
@@ -337,11 +337,11 @@ const StudentProfilePage: React.FC = () => {
   // Auth error state
   if (authError) {
     return (
-      <div className="min-h-screen bg-[#0e0e0e] flex items-center justify-center p-6">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+      <div className="min-h-screen bg-[#0e0e0e] flex items-center justify-center p-4 sm:p-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 max-w-md w-full">
           <AlertCircle className="text-red-600 mx-auto mb-4" size={48} />
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Authentication Error</h2>
-          <p className="text-gray-600 text-center mb-6">{authError}</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-4">Authentication Error</h2>
+          <p className="text-gray-600 text-center mb-6 text-sm sm:text-base">{authError}</p>
           <button
             onClick={() => window.location.href = '/login'}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold"
@@ -357,230 +357,230 @@ const StudentProfilePage: React.FC = () => {
     return null;
   }
 
- return (
-  <div className="min-h-screen p-6 text-white">
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="bg-[#0e0e0e] rounded-lg shadow-lg p-6 mb-6 border border-white/10">
-        <h1 className="text-3xl font-bold text-white mb-4">Student Profile</h1>
+  return (
+    <div className="min-h-screen p-4 sm:p-6 text-white">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-[#0e0e0e] rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 border border-white/10">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4">Student Profile</h1>
 
-        {/* Student Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <User className="text-white/80" size={20} />
-            <div>
-              <p className="text-sm text-gray-400">Name</p>
-              <p className="font-semibold text-white">{student.name}</p>
+          {/* Student Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="flex items-center gap-3">
+              <User className="text-white/80 flex-shrink-0" size={20} />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-400">Name</p>
+                <p className="font-semibold text-white truncate">{student.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Mail className="text-white/80 flex-shrink-0" size={20} />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-400">Email</p>
+                <p className="font-semibold text-white truncate">{student.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Book className="text-white/80 flex-shrink-0" size={20} />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-400">Program</p>
+                <p className="font-semibold text-white truncate">{student.student.program.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Building className="text-white/80 flex-shrink-0" size={20} />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-gray-400">Department</p>
+                <p className="font-semibold text-white truncate">{student.student.program.department.name}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Mail className="text-white/80" size={20} />
-            <div>
-              <p className="text-sm text-gray-400">Email</p>
-              <p className="font-semibold text-white">{student.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Book className="text-white/80" size={20} />
-            <div>
-              <p className="text-sm text-gray-400">Program</p>
-              <p className="font-semibold text-white">{student.student.program.name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Building className="text-white/80" size={20} />
-            <div>
-              <p className="text-sm text-gray-400">Department</p>
-              <p className="font-semibold text-white">{student.student.program.department.name}</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Enrolled Courses */}
-        {student.student.courses.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2">
-              <Calendar size={18} />
-              Enrolled Courses ({student.student.courses.length})
-            </h3>
-            <div className="bg-[#141414] rounded-lg p-3 space-y-2 border border-white/5">
-              {student.student.courses.map((course) => (
-                <div key={course.id} className="text-sm">
-                  <p className="font-medium text-white">{course.name}</p>
-                  <p className="text-gray-400">
-                    {course.teacher.name} • {course.semester.name} ({course.semester.academicYear})
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Face Recognition Status */}
-        <div className="mt-4 p-4 bg-[#141414] rounded-lg border border-white/5">
-          {checkingPhotos ? (
-            <div className="flex items-center gap-2">
-              <Loader className="animate-spin text-white/80" size={20} />
-              <span className="text-gray-200 font-medium">Checking photo status...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              {hasUploadedPhotos || student.student.hasFaceEmbedding ? (
-                <>
-                  <CheckCircle className="text-green-400" size={20} />
-                  <span className="text-green-300 font-medium">
-                    {student.student.hasFaceEmbedding
-                      ? "Face recognition enabled"
-                      : "Face photos uploaded - Processing in progress"}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="text-yellow-400" size={20} />
-                  <span className="text-yellow-300 font-medium">
-                    Face recognition not set up - Upload photos below
-                  </span>
-                </>
-              )}
+          {/* Enrolled Courses */}
+          {student.student.courses.length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-semibold text-gray-200 mb-2 flex items-center gap-2 text-sm sm:text-base">
+                <Calendar size={18} />
+                Enrolled Courses ({student.student.courses.length})
+              </h3>
+              <div className="bg-[#141414] rounded-lg p-3 space-y-2 border border-white/5">
+                {student.student.courses.map((course) => (
+                  <div key={course.id} className="text-xs sm:text-sm">
+                    <p className="font-medium text-white">{course.name}</p>
+                    <p className="text-gray-400">
+                      {course.teacher.name} • {course.semester.name} ({course.semester.academicYear})
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Face Recognition Status */}
+          <div className="mt-4 p-3 sm:p-4 bg-[#141414] rounded-lg border border-white/5">
+            {checkingPhotos ? (
+              <div className="flex items-center gap-2">
+                <Loader className="animate-spin text-white/80 flex-shrink-0" size={20} />
+                <span className="text-gray-200 font-medium text-sm sm:text-base">Checking photo status...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {hasUploadedPhotos || student.student.hasFaceEmbedding ? (
+                  <>
+                    <CheckCircle className="text-green-400 flex-shrink-0" size={20} />
+                    <span className="text-green-300 font-medium text-sm sm:text-base">
+                      {student.student.hasFaceEmbedding
+                        ? "Face recognition enabled"
+                        : "Face photos uploaded - Processing in progress"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="text-yellow-400 flex-shrink-0" size={20} />
+                    <span className="text-yellow-300 font-medium text-sm sm:text-base">
+                      Face recognition not set up - Upload photos below
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Photo Upload Section */}
-      <div className="bg-[#0e0e0e] rounded-lg shadow-lg p-6 border border-white/10">
-        <h2 className="text-2xl font-bold text-white mb-4">
-          {hasUploadedPhotos || student.student.hasFaceEmbedding
-            ? "Update Face Photos"
-            : "Upload Face Photos"}
-        </h2>
-        <p className="text-gray-400 mb-6">
-          Upload photos from three angles for accurate face recognition. You can either capture photos using your camera or upload existing images.
-        </p>
+        {/* Photo Upload Section */}
+        <div className="bg-[#0e0e0e] rounded-lg shadow-lg p-4 sm:p-6 border border-white/10">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">
+            {hasUploadedPhotos || student.student.hasFaceEmbedding
+              ? "Update Face Photos"
+              : "Upload Face Photos"}
+          </h2>
+          <p className="text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base">
+            Upload photos from three angles for accurate face recognition. You can either capture photos using your camera or upload existing images.
+          </p>
 
-        {/* Camera View */}
-        {activeCamera && (
-          <div className="mb-6 bg-black rounded-lg p-4 border border-white/10">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-white font-semibold">
-                {poses.find((p) => p.key === activeCamera)?.label}
-              </h3>
+          {/* Camera View */}
+          {activeCamera && (
+            <div className="mb-4 sm:mb-6 bg-black rounded-lg p-3 sm:p-4 border border-white/10">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-white font-semibold text-sm sm:text-base">
+                  {poses.find((p) => p.key === activeCamera)?.label}
+                </h3>
+                <button
+                  onClick={stopCamera}
+                  className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs sm:text-sm"
+                >
+                  Close Camera
+                </button>
+              </div>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full rounded-lg mb-3 bg-black"
+                style={{ maxHeight: "400px" }}
+              />
+              <p className="text-gray-400 text-xs sm:text-sm mb-3">
+                {poses.find((p) => p.key === activeCamera)?.instruction}
+              </p>
               <button
-                onClick={stopCamera}
-                className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
+                onClick={capturePhoto}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold text-sm sm:text-base"
               >
-                Close Camera
+                Capture Photo
               </button>
             </div>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full rounded-lg mb-3 bg-black"
-              style={{ maxHeight: "400px" }}
-            />
-            <p className="text-gray-400 text-sm mb-3">
-              {poses.find((p) => p.key === activeCamera)?.instruction}
-            </p>
-            <button
-              onClick={capturePhoto}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold"
-            >
-              Capture Photo
-            </button>
-          </div>
-        )}
+          )}
 
-        {/* Photo Upload Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {poses.map(({ key, label, instruction }) => (
-            <div key={key} className="border-2 border-dashed border-white/10 rounded-lg p-4 bg-[#141414]">
-              <h3 className="font-semibold text-white mb-2">{label}</h3>
-              <p className="text-sm text-gray-400 mb-4">{instruction}</p>
+          {/* Photo Upload Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            {poses.map(({ key, label, instruction }) => (
+              <div key={key} className="border-2 border-dashed border-white/10 rounded-lg p-3 sm:p-4 bg-[#141414]">
+                <h3 className="font-semibold text-white mb-2 text-sm sm:text-base">{label}</h3>
+                <p className="text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">{instruction}</p>
 
-              {previews[key] ? (
-                <div className="relative">
-                  <img
-                    src={previews[key] || ""}
-                    alt={label}
-                    className="w-full h-48 object-cover rounded-lg mb-3"
-                  />
-                  <button
-                    onClick={() => removePhoto(key)}
-                    className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full hover:bg-red-700"
-                  >
-                    ×
-                  </button>
-                  <div className="flex items-center gap-2 text-green-400">
-                    <CheckCircle size={16} />
-                    <span className="text-sm">Photo ready</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={() => startCamera(key)}
-                    disabled={activeCamera !== null}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white py-2 rounded-lg flex items-center justify-center gap-2"
-                  >
-                    <Camera size={18} />
-                    Use Camera
-                  </button>
-                  <label className="w-full bg-[#1a1a1a] hover:bg-[#222222] text-white py-2 rounded-lg flex items-center justify-center gap-2 cursor-pointer border border-white/5">
-                    <Upload size={18} />
-                    Upload Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(key, e)}
-                      className="hidden"
+                {previews[key] ? (
+                  <div className="relative">
+                    <img
+                      src={previews[key] || ""}
+                      alt={label}
+                      className="w-full h-40 sm:h-48 object-cover rounded-lg mb-3"
                     />
-                  </label>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Status Message */}
-        {message && uploadStatus !== "idle" && (
-          <div
-            className={`p-4 rounded-lg mb-4 ${
-              uploadStatus === "success"
-                ? "bg-green-900 text-green-100"
-                : uploadStatus === "error"
-                ? "bg-red-900 text-red-100"
-                : uploadStatus === "uploading"
-                ? "bg-blue-900 text-blue-100"
-                : "bg-[#141414] text-gray-100"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {uploadStatus === "success" && <CheckCircle size={20} />}
-              {uploadStatus === "error" && <AlertCircle size={20} />}
-              {uploadStatus === "uploading" && <Loader className="animate-spin" size={20} />}
-              <span>{message}</span>
-            </div>
+                    <button
+                      onClick={() => removePhoto(key)}
+                      className="absolute top-2 right-2 bg-red-600 text-white p-1.5 sm:p-2 rounded-full hover:bg-red-700 text-sm sm:text-base"
+                    >
+                      ×
+                    </button>
+                    <div className="flex items-center gap-2 text-green-400">
+                      <CheckCircle size={16} />
+                      <span className="text-xs sm:text-sm">Photo ready</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3">
+                    <button
+                      onClick={() => startCamera(key)}
+                      disabled={activeCamera !== null}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white py-2 rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm"
+                    >
+                      <Camera size={16} className="sm:w-[18px] sm:h-[18px]" />
+                      Use Camera
+                    </button>
+                    <label className="w-full bg-[#1a1a1a] hover:bg-[#222222] text-white py-2 rounded-lg flex items-center justify-center gap-2 cursor-pointer border border-white/5 text-xs sm:text-sm">
+                      <Upload size={16} className="sm:w-[18px] sm:h-[18px]" />
+                      Upload Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(key, e)}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* Submit Button */}
-        <button
-          onClick={handleSubmit}
-          disabled={uploadStatus === "uploading" || Object.values(photos).every((p) => p === null)}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 text-white py-3 rounded-lg font-semibold text-lg transition-colors"
-        >
-          {uploadStatus === "uploading" ? "Processing..." : "Submit Photos"}
-        </button>
+          {/* Status Message */}
+          {message && uploadStatus !== "idle" && (
+            <div
+              className={`p-3 sm:p-4 rounded-lg mb-4 ${
+                uploadStatus === "success"
+                  ? "bg-green-900 text-green-100"
+                  : uploadStatus === "error"
+                  ? "bg-red-900 text-red-100"
+                  : uploadStatus === "uploading"
+                  ? "bg-blue-900 text-blue-100"
+                  : "bg-[#141414] text-gray-100"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {uploadStatus === "success" && <CheckCircle size={18} className="sm:w-5 sm:h-5 flex-shrink-0" />}
+                {uploadStatus === "error" && <AlertCircle size={18} className="sm:w-5 sm:h-5 flex-shrink-0" />}
+                {uploadStatus === "uploading" && <Loader className="animate-spin flex-shrink-0" size={18} />}
+                <span className="text-xs sm:text-sm">{message}</span>
+              </div>
+            </div>
+          )}
 
-        <p className="text-sm text-gray-400 mt-4 text-center">
-          Your photos will be processed securely for the face recognition attendance system.
-        </p>
+          {/* Submit Button */}
+          <button
+            onClick={handleSubmit}
+            disabled={uploadStatus === "uploading" || Object.values(photos).every((p) => p === null)}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 text-white py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg transition-colors"
+          >
+            {uploadStatus === "uploading" ? "Processing..." : "Submit Photos"}
+          </button>
+
+          <p className="text-xs sm:text-sm text-gray-400 mt-3 sm:mt-4 text-center">
+            Your photos will be processed securely for the face recognition attendance system.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 export default StudentProfilePage;

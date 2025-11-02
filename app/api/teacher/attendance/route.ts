@@ -2,19 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
-import { writeFile, mkdir, readdir, unlink } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
-import { spawn } from "child_process";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-const DATASET_DIR = path.join(process.cwd(), "dataset");
-const TEST_IMAGES_DIR = path.join(process.cwd(), "test-images");
-const OUTPUT_DIR = path.join(process.cwd(), "output");
+const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:8000"; // Set in Vercel env
 
-// Helper: Verify JWT Token
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -24,73 +16,6 @@ function verifyToken(request: NextRequest) {
   return jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
 }
 
-// Helper: Execute Python Script
-function executePythonScript(scriptName: string, args: string[] = []): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const scriptPath = path.join(process.cwd(), scriptName);
-    
-    console.log(`Executing: python3 ${scriptPath}`);
-    
-    const pythonProcess = spawn("python3", [scriptPath, ...args]);
-
-    let stdout = "";
-    let stderr = "";
-
-    pythonProcess.stdout.on("data", (data) => {
-      const output = data.toString();
-      stdout += output;
-      console.log("Python stdout:", output);
-    });
-
-    pythonProcess.stderr.on("data", (data) => {
-      const output = data.toString();
-      stderr += output;
-      console.error("Python stderr:", output);
-    });
-
-    pythonProcess.on("close", (code) => {
-      console.log(`Python script exited with code ${code}`);
-      if (code !== 0) {
-        reject(new Error(`Python script failed with code ${code}: ${stderr}`));
-      } else {
-        resolve(stdout);
-      }
-    });
-
-    pythonProcess.on("error", (error) => {
-      console.error("Python process error:", error);
-      reject(error);
-    });
-  });
-}
-
-// Helper: Ensure directories exist
-async function ensureDirectories() {
-  const dirs = [UPLOAD_DIR, DATASET_DIR, TEST_IMAGES_DIR, OUTPUT_DIR];
-  for (const dir of dirs) {
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
-    }
-  }
-}
-
-// Helper: Clean directory
-async function cleanDirectory(dirPath: string) {
-  if (existsSync(dirPath)) {
-    try {
-      const files = await readdir(dirPath);
-      await Promise.all(
-        files.map((file) => unlink(path.join(dirPath, file)).catch(() => {}))
-      );
-    } catch (error) {
-      console.error(`Error cleaning directory ${dirPath}:`, error);
-    }
-  }
-}
-
-// ============================================================================
-// MAIN POST HANDLER - Routes all operations
-// ============================================================================
 export async function POST(request: NextRequest) {
   try {
     const decoded = verifyToken(request);
@@ -98,7 +23,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Get teacher record
     const teacher = await prisma.teacher.findUnique({
       where: { userId: decoded.userId },
     });
@@ -107,7 +31,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
     }
 
-    // Determine operation from URL search params
     const url = new URL(request.url);
     const operation = url.searchParams.get("operation");
 
@@ -131,10 +54,7 @@ export async function POST(request: NextRequest) {
         return await submitAttendance(request);
       
       default:
-        return NextResponse.json(
-          { error: "Invalid operation" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Invalid operation" }, { status: 400 });
     }
   } catch (error: any) {
     console.error("API Error:", error);
@@ -145,9 +65,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ============================================================================
-// OPERATION: Get Courses
-// ============================================================================
 async function getCourses(teacherId: string) {
   const courses = await prisma.course.findMany({
     where: { teacherId },
@@ -155,16 +72,12 @@ async function getCourses(teacherId: string) {
       semester: {
         include: {
           academicYear: {
-            include: {
-              program: true,
-            },
+            include: { program: true },
           },
         },
       },
       students: true,
-      _count: {
-        select: { students: true },
-      },
+      _count: { select: { students: true } },
     },
     orderBy: { name: "asc" },
   });
@@ -181,18 +94,12 @@ async function getCourses(teacherId: string) {
   return NextResponse.json(formattedCourses);
 }
 
-// ============================================================================
-// OPERATION: Get Students for a Course
-// ============================================================================
 async function getStudents(request: NextRequest) {
   const body = await request.json();
   const { courseId } = body;
 
   if (!courseId) {
-    return NextResponse.json(
-      { error: "Course ID required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Course ID required" }, { status: 400 });
   }
 
   const course = await prisma.course.findUnique({
@@ -200,18 +107,9 @@ async function getStudents(request: NextRequest) {
     include: {
       students: {
         include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
+          user: { select: { name: true, email: true } },
         },
-        orderBy: {
-          user: {
-            name: "asc",
-          },
-        },
+        orderBy: { user: { name: "asc" } },
       },
     },
   });
@@ -230,25 +128,16 @@ async function getStudents(request: NextRequest) {
   return NextResponse.json(formattedStudents);
 }
 
-// ============================================================================
-// OPERATION: Train Student (Upload Photos)
-// ============================================================================
 async function trainStudent(request: NextRequest, teacherId: string) {
-  await ensureDirectories();
-
   const formData = await request.formData();
   const studentId = formData.get("studentId") as string;
   const courseId = formData.get("courseId") as string;
   const photos = formData.getAll("photos") as File[];
 
   if (!studentId || !courseId || photos.length === 0) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // Verify student is in the course
   const student = await prisma.student.findFirst({
     where: {
       id: studentId,
@@ -259,9 +148,7 @@ async function trainStudent(request: NextRequest, teacherId: string) {
         },
       },
     },
-    include: {
-      user: true,
-    },
+    include: { user: true },
   });
 
   if (!student) {
@@ -271,155 +158,108 @@ async function trainStudent(request: NextRequest, teacherId: string) {
     );
   }
 
-  // Create student directory in dataset
-  const studentDir = path.join(DATASET_DIR, studentId);
-  if (!existsSync(studentDir)) {
-    await mkdir(studentDir, { recursive: true });
-  }
-
-  // Save photos
-  const savedFiles = [];
-  for (let i = 0; i < photos.length; i++) {
-    const photo = photos[i];
-    const buffer = Buffer.from(await photo.arrayBuffer());
-    const filename = `${studentId}_${Date.now()}_${i}.jpg`;
-    const filepath = path.join(studentDir, filename);
-    await writeFile(filepath, buffer);
-    savedFiles.push(filename);
-  }
-
-  return NextResponse.json({
-    success: true,
-    studentId,
-    studentName: student.user.name,
-    photosSaved: savedFiles.length,
-    files: savedFiles,
-  });
-}
-
-// ============================================================================
-// OPERATION: Run Training Script
-// ============================================================================
-async function runTraining(request: NextRequest) {
-  const body = await request.json();
-  const { courseId } = body;
-
-  if (!courseId) {
-    return NextResponse.json(
-      { error: "Course ID required" },
-      { status: 400 }
-    );
-  }
-
   try {
-    // Execute Python training script
-    const output = await executePythonScript("train_faces.py");
-    
-    // Parse training results
-    const lines = output.split("\n");
-    let trainingResults: any = {
-      studentsTrained: 0,
-      imagesProcessed: 0,
-      trainingSamples: 0
-    };
-    
-    for (const line of lines) {
-      if (line.includes("Students trained:")) {
-        const match = line.match(/(\d+)/);
-        if (match) trainingResults.studentsTrained = parseInt(match[1]);
-      }
-      if (line.includes("Total images processed:")) {
-        const match = line.match(/(\d+)/);
-        if (match) trainingResults.imagesProcessed = parseInt(match[1]);
-      }
-      if (line.includes("Total training samples:")) {
-        const match = line.match(/(\d+)/);
-        if (match) trainingResults.trainingSamples = parseInt(match[1]);
-      }
+    // Forward to Python API
+    const pythonFormData = new FormData();
+    pythonFormData.append("studentId", studentId);
+    pythonFormData.append("front", photos[0]);
+    pythonFormData.append("left", photos[1]);
+    pythonFormData.append("right", photos[2]);
+
+    const response = await fetch(`${PYTHON_API_URL}/api/process-student`, {
+      method: "POST",
+      body: pythonFormData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Python API processing failed");
     }
 
+    const result = await response.json();
+    
     return NextResponse.json({
       success: true,
-      message: "Training completed successfully",
-      results: trainingResults,
-      output: output.substring(0, 1000), // First 1000 chars for debugging
+      studentId,
+      studentName: student.user.name,
+      photosSaved: 3,
+      result,
     });
   } catch (error: any) {
-    console.error("Training error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Training failed",
-        details: error.message,
-      },
+      { error: "Failed to process photos", details: error.message },
       { status: 500 }
     );
   }
 }
 
-// ============================================================================
-// OPERATION: Recognize Faces
-// ============================================================================
-// Replace the recognizeFaces function in your route.ts
+async function runTraining(request: NextRequest) {
+  const body = await request.json();
+  const { courseId } = body;
+
+  if (!courseId) {
+    return NextResponse.json({ error: "Course ID required" }, { status: 400 });
+  }
+
+  try {
+    // Call Python API
+    const response = await fetch(`${PYTHON_API_URL}/api/train`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Training failed");
+    }
+
+    const result = await response.json();
+
+    return NextResponse.json({
+      success: true,
+      message: "Training completed successfully",
+      results: result,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: "Training failed", details: error.message },
+      { status: 500 }
+    );
+  }
+}
 
 async function recognizeFaces(request: NextRequest) {
-  await ensureDirectories();
-  await cleanDirectory(TEST_IMAGES_DIR);
-
   const formData = await request.formData();
   const courseId = formData.get("courseId") as string;
   const batchId = formData.get("batchId") as string;
   const frames = formData.getAll("frames") as File[];
-  const autoSubmit = formData.get("autoSubmit") !== "false"; // Default true
+  const autoSubmit = formData.get("autoSubmit") !== "false";
 
   if (!courseId || frames.length === 0) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
-  }
-
-  // Save frames to test-images directory
-  const savedFrames = [];
-  for (let i = 0; i < frames.length; i++) {
-    const frame = frames[i];
-    const buffer = Buffer.from(await frame.arrayBuffer());
-    const filename = `frame_${i}_${Date.now()}.jpg`;
-    const filepath = path.join(TEST_IMAGES_DIR, filename);
-    await writeFile(filepath, buffer);
-    savedFrames.push(filename);
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   try {
-    // Execute Python recognition script
-    const output = await executePythonScript("scripts/recognize.py");
-    
-    // Parse JSON output from Python script
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Failed to parse recognition results");
+    // Forward to Python API
+    const pythonFormData = new FormData();
+    pythonFormData.append("courseId", courseId);
+    frames.forEach((frame) => pythonFormData.append("frames", frame));
+
+    const response = await fetch(`${PYTHON_API_URL}/api/recognize`, {
+      method: "POST",
+      body: pythonFormData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Recognition failed");
     }
 
-    const results = JSON.parse(jsonMatch[0]);
-
-    // Check for errors in results
-    if (results.error) {
-      throw new Error(results.error);
-    }
-
-    // Get student details for recognized IDs
+    const results = await response.json();
     const recognizedStudentIds = results.recognizedStudents || [];
+
+    // Get student details
     const students = await prisma.student.findMany({
-      where: {
-        id: { in: recognizedStudentIds },
-      },
+      where: { id: { in: recognizedStudentIds } },
       include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
+        user: { select: { name: true, email: true } },
       },
     });
 
@@ -427,7 +267,6 @@ async function recognizeFaces(request: NextRequest) {
       students.map((s) => [s.id, { name: s.user.name, email: s.user.email }])
     );
 
-    // Enhance results with student names
     const enhancedResults = {
       ...results,
       recognizedStudents: recognizedStudentIds.map((id: string) => ({
@@ -440,124 +279,81 @@ async function recognizeFaces(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    // 🔥 AUTO-SUBMIT ATTENDANCE AFTER RECOGNITION
+    // Auto-submit attendance
     let attendanceResult = null;
     if (autoSubmit) {
-      try {
-        console.log("🎯 Auto-submitting attendance for course:", courseId);
-        
-        const attendanceDate = new Date();
-        const startOfDay = new Date(attendanceDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(attendanceDate);
-        endOfDay.setHours(23, 59, 59, 999);
+      const attendanceDate = new Date();
+      const startOfDay = new Date(attendanceDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(attendanceDate);
+      endOfDay.setHours(23, 59, 59, 999);
 
-        // Get all students in the course
-        const course = await prisma.course.findUnique({
-          where: { id: courseId },
-          include: {
-            students: {
-              include: {
-                user: {
-                  select: { name: true, email: true }
-                }
-              }
-            },
+      const course = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+          students: {
+            include: { user: { select: { name: true, email: true } } },
           },
-        });
+        },
+      });
 
-        if (!course) {
-          throw new Error("Course not found");
-        }
+      if (!course) {
+        throw new Error("Course not found");
+      }
 
-        // Create set of recognized student IDs
-        const recognizedIds = new Set(recognizedStudentIds);
+      const recognizedIds = new Set(recognizedStudentIds);
 
-        // Create or update attendance records for all students
-        const attendanceRecords = await Promise.all(
-          course.students.map(async (student) => {
-            const isPresent = recognizedIds.has(student.id);
-            
-            // Check if attendance already exists for today
-            const existingAttendance = await prisma.attendance.findFirst({
-              where: {
+      const attendanceRecords = await Promise.all(
+        course.students.map(async (student) => {
+          const isPresent = recognizedIds.has(student.id);
+
+          const existingAttendance = await prisma.attendance.findFirst({
+            where: {
+              studentId: student.id,
+              courseId: courseId,
+              timestamp: { gte: startOfDay, lt: endOfDay },
+            },
+          });
+
+          if (existingAttendance) {
+            return await prisma.attendance.update({
+              where: { id: existingAttendance.id },
+              data: { status: isPresent, timestamp: attendanceDate },
+              include: { student: { include: { user: true } } },
+            });
+          } else {
+            return await prisma.attendance.create({
+              data: {
                 studentId: student.id,
                 courseId: courseId,
-                timestamp: {
-                  gte: startOfDay,
-                  lt: endOfDay,
-                },
+                status: isPresent,
+                timestamp: attendanceDate,
               },
+              include: { student: { include: { user: true } } },
             });
+          }
+        })
+      );
 
-            if (existingAttendance) {
-              // Update existing record
-              const updated = await prisma.attendance.update({
-                where: { id: existingAttendance.id },
-                data: {
-                  status: isPresent,
-                  timestamp: attendanceDate,
-                },
-                include: {
-                  student: {
-                    include: { user: true }
-                  }
-                }
-              });
-              console.log(`✏️  Updated attendance for ${updated.student.user.name}: ${isPresent ? 'Present' : 'Absent'}`);
-              return updated;
-            } else {
-              // Create new record
-              const created = await prisma.attendance.create({
-                data: {
-                  studentId: student.id,
-                  courseId: courseId,
-                  status: isPresent,
-                  timestamp: attendanceDate,
-                },
-                include: {
-                  student: {
-                    include: { user: true }
-                  }
-                }
-              });
-              console.log(`✅ Created attendance for ${created.student.user.name}: ${isPresent ? 'Present' : 'Absent'}`);
-              return created;
-            }
-          })
-        );
-
-        // Calculate statistics
-        const presentCount = attendanceRecords.filter((r) => r.status).length;
-        const absentCount = attendanceRecords.length - presentCount;
-
-        attendanceResult = {
-          success: true,
-          totalStudents: attendanceRecords.length,
-          present: presentCount,
-          absent: absentCount,
-          attendanceRate: ((presentCount / attendanceRecords.length) * 100).toFixed(1),
-          records: attendanceRecords.map(r => ({
-            studentId: r.studentId,
-            studentName: r.student.user.name,
-            status: r.status,
-            timestamp: r.timestamp
-          }))
-        };
-
-        console.log(`✅ Attendance submitted: ${presentCount}/${attendanceRecords.length} present`);
-      } catch (attendanceError: any) {
-        console.error("❌ Auto-submit attendance error:", attendanceError);
-        attendanceResult = {
-          success: false,
-          error: attendanceError.message
-        };
-      }
+      const presentCount = attendanceRecords.filter((r) => r.status).length;
+      attendanceResult = {
+        success: true,
+        totalStudents: attendanceRecords.length,
+        present: presentCount,
+        absent: attendanceRecords.length - presentCount,
+        attendanceRate: ((presentCount / attendanceRecords.length) * 100).toFixed(1),
+        records: attendanceRecords.map((r) => ({
+          studentId: r.studentId,
+          studentName: r.student.user.name,
+          status: r.status,
+          timestamp: r.timestamp,
+        })),
+      };
     }
 
     return NextResponse.json({
       ...enhancedResults,
-      attendance: attendanceResult, // Include attendance results
+      attendance: attendanceResult,
     });
   } catch (error: any) {
     console.error("Recognition error:", error);
@@ -575,77 +371,54 @@ async function recognizeFaces(request: NextRequest) {
   }
 }
 
-// ============================================================================
-// OPERATION: Submit Attendance
-// ============================================================================
 async function submitAttendance(request: NextRequest) {
   const body = await request.json();
   const { courseId, recognitionResults, date } = body;
 
   if (!courseId || !recognitionResults) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   try {
     const attendanceDate = date ? new Date(date) : new Date();
-    
-    // Set to start of day for comparison
     const startOfDay = new Date(attendanceDate);
     startOfDay.setHours(0, 0, 0, 0);
-    
     const endOfDay = new Date(attendanceDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get all students in the course
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      include: {
-        students: true,
-      },
+      include: { students: true },
     });
 
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // Extract recognized student IDs
     const recognizedIds = new Set(
-      recognitionResults.recognizedStudents.map((s: any) => 
-        typeof s === 'string' ? s : s.id
+      recognitionResults.recognizedStudents.map((s: any) =>
+        typeof s === "string" ? s : s.id
       )
     );
 
-    // Create or update attendance records for all students
     const attendanceRecords = await Promise.all(
       course.students.map(async (student) => {
         const isPresent = recognizedIds.has(student.id);
-        
-        // Check if attendance already exists for this student, course, and date
+
         const existingAttendance = await prisma.attendance.findFirst({
           where: {
             studentId: student.id,
             courseId: courseId,
-            timestamp: {
-              gte: startOfDay,
-              lt: endOfDay,
-            },
+            timestamp: { gte: startOfDay, lt: endOfDay },
           },
         });
 
         if (existingAttendance) {
-          // Update existing record
           return prisma.attendance.update({
             where: { id: existingAttendance.id },
-            data: {
-              status: isPresent,
-              timestamp: attendanceDate,
-            },
+            data: { status: isPresent, timestamp: attendanceDate },
           });
         } else {
-          // Create new record
           return prisma.attendance.create({
             data: {
               studentId: student.id,
@@ -658,9 +431,7 @@ async function submitAttendance(request: NextRequest) {
       })
     );
 
-    // Calculate statistics
     const presentCount = attendanceRecords.filter((r) => r.status).length;
-    const absentCount = attendanceRecords.length - presentCount;
 
     return NextResponse.json({
       success: true,
@@ -668,30 +439,19 @@ async function submitAttendance(request: NextRequest) {
       statistics: {
         totalStudents: attendanceRecords.length,
         present: presentCount,
-        absent: absentCount,
+        absent: attendanceRecords.length - presentCount,
         attendanceRate: ((presentCount / attendanceRecords.length) * 100).toFixed(1),
-      },
-      recognitionData: {
-        totalFaces: recognitionResults.totalFaces,
-        averageConfidence: recognitionResults.averageConfidence,
       },
       timestamp: attendanceDate.toISOString(),
     });
   } catch (error: any) {
-    console.error("Submit attendance error:", error);
     return NextResponse.json(
-      {
-        error: "Failed to submit attendance",
-        details: error.message,
-      },
+      { error: "Failed to submit attendance", details: error.message },
       { status: 500 }
     );
   }
 }
 
-// ============================================================================
-// GET Handler - For retrieving attendance records
-// ============================================================================
 export async function GET(request: NextRequest) {
   try {
     const decoded = verifyToken(request);
@@ -703,62 +463,47 @@ export async function GET(request: NextRequest) {
     const operation = url.searchParams.get("operation");
     const courseId = url.searchParams.get("courseId");
 
-    switch (operation) {
-      case "get-attendance-history":
-        if (!courseId) {
-          return NextResponse.json(
-            { error: "Course ID required" },
-            { status: 400 }
-          );
-        }
+    if (operation === "get-attendance-history") {
+      if (!courseId) {
+        return NextResponse.json({ error: "Course ID required" }, { status: 400 });
+      }
 
-        const attendance = await prisma.attendance.findMany({
-          where: { courseId },
-          include: {
-            student: {
-              include: {
-                user: {
-                  select: {
-                    name: true,
-                    email: true,
-                  },
-                },
-              },
+      const attendance = await prisma.attendance.findMany({
+        where: { courseId },
+        include: {
+          student: {
+            include: {
+              user: { select: { name: true, email: true } },
             },
           },
-          orderBy: { timestamp: "desc" },
+        },
+        orderBy: { timestamp: "desc" },
+      });
+
+      const groupedByDate = attendance.reduce((acc: any, record) => {
+        const dateKey = record.timestamp.toISOString().split("T")[0];
+        if (!acc[dateKey]) {
+          acc[dateKey] = [];
+        }
+        acc[dateKey].push({
+          studentId: record.studentId,
+          studentName: record.student.user.name,
+          studentEmail: record.student.user.email,
+          status: record.status,
+          timestamp: record.timestamp,
         });
+        return acc;
+      }, {});
 
-        // Group by date
-        const groupedByDate = attendance.reduce((acc: any, record) => {
-          const dateKey = record.timestamp.toISOString().split("T")[0];
-          if (!acc[dateKey]) {
-            acc[dateKey] = [];
-          }
-          acc[dateKey].push({
-            studentId: record.studentId,
-            studentName: record.student.user.name,
-            studentEmail: record.student.user.email,
-            status: record.status,
-            timestamp: record.timestamp,
-          });
-          return acc;
-        }, {});
-
-        return NextResponse.json({
-          courseId,
-          attendanceByDate: groupedByDate,
-          totalRecords: attendance.length,
-        });
-
-      default:
-        return NextResponse.json(
-          { error: "Invalid operation" },
-          { status: 400 }
-        );
+      return NextResponse.json({
+        courseId,
+        attendanceByDate: groupedByDate,
+        totalRecords: attendance.length,
+      });
     }
+
+    return NextResponse.json({ error: "Invalid operation" }, { status: 400 });
   } catch (error: any) {
-    console.error("GET API Error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }

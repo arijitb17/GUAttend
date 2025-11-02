@@ -98,9 +98,9 @@ export default function AttendanceHistoryPage() {
   // ---------- Error ----------
   if (error)
     return (
-      <div className="p-6 max-w-7xl mx-auto text-white">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto text-white">
         <div className="bg-red-600/10 border border-red-500/40 rounded-lg p-4">
-          <p className="text-red-400">{error}</p>
+          <p className="text-red-400 text-sm sm:text-base">{error}</p>
           <button
             onClick={fetchHistory}
             className="mt-3 text-sm bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
@@ -112,51 +112,51 @@ export default function AttendanceHistoryPage() {
     );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-white">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto text-white">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold mb-2">Attendance History</h1>
-        <p className="text-gray-400">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Attendance History</h1>
+        <p className="text-gray-400 text-sm sm:text-base">
           Track your attendance records across all enrolled courses
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-4">
-          <p className="text-gray-400 text-sm mb-1">Total Classes</p>
-          <p className="text-2xl font-bold text-white">{stats.total}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-3 sm:p-4">
+          <p className="text-gray-400 text-xs sm:text-sm mb-1">Total Classes</p>
+          <p className="text-xl sm:text-2xl font-bold text-white">{stats.total}</p>
         </div>
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-          <p className="text-green-400 text-sm mb-1">Present</p>
-          <p className="text-2xl font-bold text-green-300">{stats.present}</p>
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 sm:p-4">
+          <p className="text-green-400 text-xs sm:text-sm mb-1">Present</p>
+          <p className="text-xl sm:text-2xl font-bold text-green-300">{stats.present}</p>
         </div>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-          <p className="text-red-400 text-sm mb-1">Absent</p>
-          <p className="text-2xl font-bold text-red-300">{stats.absent}</p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 sm:p-4">
+          <p className="text-red-400 text-xs sm:text-sm mb-1">Absent</p>
+          <p className="text-xl sm:text-2xl font-bold text-red-300">{stats.absent}</p>
         </div>
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-          <p className="text-blue-400 text-sm mb-1">Attendance Rate</p>
-          <p className="text-2xl font-bold text-blue-300">{stats.percentage}%</p>
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 sm:p-4">
+          <p className="text-blue-400 text-xs sm:text-sm mb-1">Attendance Rate</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-300">{stats.percentage}%</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-[#1a1a1a]/80 border border-white/10 p-4 rounded-xl mb-6">
-        <div className="flex flex-col md:flex-row items-center gap-4">
+      <div className="bg-[#1a1a1a]/80 border border-white/10 p-3 sm:p-4 rounded-xl mb-4 sm:mb-6">
+        <div className="flex flex-col gap-3 sm:gap-4">
           <input
             type="text"
             placeholder="Search by course name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-4 py-2 rounded-lg bg-[#141414] border border-white/10 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3 sm:px-4 py-2 rounded-lg bg-[#141414] border border-white/10 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["all", "present", "absent"].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition flex-1 sm:flex-initial ${
                   filter === f
                     ? f === "present"
                       ? "bg-green-600 text-white"
@@ -172,10 +172,11 @@ export default function AttendanceHistoryPage() {
             {filteredRecords.length > 0 && (
               <button
                 onClick={downloadCSV}
-                className="px-4 py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 flex items-center gap-2 transition"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 flex items-center justify-center gap-2 transition text-xs sm:text-sm flex-1 sm:flex-initial"
               >
-                <Download size={18} />
-                Export
+                <Download size={16} className="sm:w-[18px] sm:h-[18px]" />
+                <span className="hidden sm:inline">Export</span>
+                <span className="sm:hidden">CSV</span>
               </button>
             )}
           </div>
@@ -184,72 +185,120 @@ export default function AttendanceHistoryPage() {
 
       {/* Table */}
       {filteredRecords.length === 0 ? (
-        <div className="bg-[#1a1a1a]/70 border border-white/10 rounded-xl p-12 text-center">
-          <Calendar className="mx-auto mb-4 text-gray-500" size={48} />
-          <p className="text-gray-300 text-lg">
+        <div className="bg-[#1a1a1a]/70 border border-white/10 rounded-xl p-8 sm:p-12 text-center">
+          <Calendar className="mx-auto mb-4 text-gray-500" size={40} />
+          <p className="text-gray-300 text-base sm:text-lg">
             {searchTerm || filter !== "all"
               ? "No records match your filters"
               : "No attendance records found"}
           </p>
           {records.length === 0 && (
-            <p className="text-gray-500 text-sm mt-2">
+            <p className="text-gray-500 text-xs sm:text-sm mt-2">
               Your attendance will appear here once classes are attended
             </p>
           )}
         </div>
       ) : (
-        <div className="bg-[#1a1a1a]/80 border border-white/10 rounded-xl overflow-hidden shadow-md">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#232323] text-gray-400">
-                <tr>
-                  <th className="px-6 py-3 text-left font-semibold">Course</th>
-                  <th className="px-6 py-3 text-left font-semibold">Entry Code</th>
-                  <th className="px-6 py-3 text-left font-semibold">Status</th>
-                  <th className="px-6 py-3 text-left font-semibold">Date & Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRecords.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="border-t border-white/10 hover:bg-white/5 transition"
-                  >
-                    <td className="px-6 py-4 text-white">
-                      {record.course?.name || "N/A"}
-                    </td>
-                    <td className="px-6 py-4 text-gray-400 font-mono">
-                      {record.course?.entryCode || "N/A"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
-                          record.status
-                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                            : "bg-red-500/20 text-red-400 border border-red-500/30"
-                        }`}
-                      >
-                        {record.status ? "✓ Present" : "✗ Absent"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-400">
-                      {new Date(record.timestamp).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}{" "}
-                      at{" "}
-                      {new Date(record.timestamp).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-[#1a1a1a]/80 border border-white/10 rounded-xl overflow-hidden shadow-md">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[#232323] text-gray-400">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold">Course</th>
+                    <th className="px-6 py-3 text-left font-semibold">Entry Code</th>
+                    <th className="px-6 py-3 text-left font-semibold">Status</th>
+                    <th className="px-6 py-3 text-left font-semibold">Date & Time</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredRecords.map((record) => (
+                    <tr
+                      key={record.id}
+                      className="border-t border-white/10 hover:bg-white/5 transition"
+                    >
+                      <td className="px-6 py-4 text-white">
+                        {record.course?.name || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 text-gray-400 font-mono">
+                        {record.course?.entryCode || "N/A"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                            record.status
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-red-500/20 text-red-400 border border-red-500/30"
+                          }`}
+                        >
+                          {record.status ? "✓ Present" : "✗ Absent"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-400">
+                        {new Date(record.timestamp).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        at{" "}
+                        {new Date(record.timestamp).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden space-y-3">
+            {filteredRecords.map((record) => (
+              <div
+                key={record.id}
+                className="bg-[#1a1a1a]/80 border border-white/10 rounded-xl p-4"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-semibold mb-1 truncate">
+                      {record.course?.name || "N/A"}
+                    </h3>
+                    <p className="text-gray-400 text-xs font-mono">
+                      {record.course?.entryCode || "N/A"}
+                    </p>
+                  </div>
+                  <span
+                    className={`ml-2 flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${
+                      record.status
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-red-500/20 text-red-400 border border-red-500/30"
+                    }`}
+                  >
+                    {record.status ? "✓ Present" : "✗ Absent"}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-400 flex items-center gap-1">
+                  <Calendar size={12} />
+                  <span>
+                    {new Date(record.timestamp).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}{" "}
+                    at{" "}
+                    {new Date(record.timestamp).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

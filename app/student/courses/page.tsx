@@ -103,14 +103,14 @@ export default function MyCoursesPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-white">
-        <div className="text-center max-w-md bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-white px-4">
+        <div className="text-center max-w-md w-full bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
           <div className="text-red-500 text-3xl mb-4">⚠️</div>
-          <p className="font-semibold mb-2">Error Loading Courses</p>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="font-semibold mb-2 text-sm sm:text-base">Error Loading Courses</p>
+          <p className="text-gray-400 mb-4 text-xs sm:text-sm">{error}</p>
           <button
             onClick={fetchCourses}
-            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+            className="px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] text-sm sm:text-base"
           >
             Try Again
           </button>
@@ -120,124 +120,124 @@ export default function MyCoursesPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto text-white">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto text-white">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">My Courses</h1>
-        <p className="text-gray-400 mt-2">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold">My Courses</h1>
+        <p className="text-gray-400 mt-2 text-sm sm:text-base">
           View your enrolled courses and track your progress.
         </p>
       </div>
 
       {/* Stats */}
       {courses.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
             <div>
-              <p className="text-sm text-gray-400">Total Courses</p>
-              <p className="text-3xl font-bold text-white mt-1">{courses.length}</p>
+              <p className="text-xs sm:text-sm text-gray-400">Total Courses</p>
+              <p className="text-2xl sm:text-3xl font-bold text-white mt-1">{courses.length}</p>
             </div>
-            <BookOpen className="text-blue-400" size={32} />
+            <BookOpen className="text-blue-400" size={28} />
           </div>
 
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
+          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
             <div>
-              <p className="text-sm text-gray-400">Active Semester</p>
-              <p className="text-lg font-semibold text-white mt-1">
+              <p className="text-xs sm:text-sm text-gray-400">Active Semester</p>
+              <p className="text-base sm:text-lg font-semibold text-white mt-1 truncate">
                 {courses[0]?.semester?.name || "N/A"}
               </p>
             </div>
-            <Calendar className="text-green-400" size={32} />
+            <Calendar className="text-green-400 flex-shrink-0" size={28} />
           </div>
 
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
+          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all sm:col-span-2 lg:col-span-1">
             <div>
-              <p className="text-sm text-gray-400">Total Sessions</p>
-              <p className="text-3xl font-bold text-white mt-1">
+              <p className="text-xs sm:text-sm text-gray-400">Total Sessions</p>
+              <p className="text-2xl sm:text-3xl font-bold text-white mt-1">
                 {courses.reduce((sum, c) => sum + (c._count?.attendance || 0), 0)}
               </p>
             </div>
-            <GraduationCap className="text-purple-400" size={32} />
+            <GraduationCap className="text-purple-400" size={28} />
           </div>
         </div>
       )}
 
       {/* Search */}
-      <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 mb-8 backdrop-blur-md flex items-center gap-3">
-        <Search className="text-gray-400" size={20} />
+      <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8 backdrop-blur-md flex items-center gap-3">
+        <Search className="text-gray-400 flex-shrink-0" size={18} />
         <input
           type="text"
           placeholder="Search courses, teachers, or entry codes..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-transparent w-full outline-none text-white placeholder-gray-500"
+          className="bg-transparent w-full outline-none text-white placeholder-gray-500 text-sm sm:text-base"
         />
       </div>
 
       {/* Course Grid */}
       {filteredCourses.length === 0 ? (
-        <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-12 backdrop-blur-md text-center">
-          <BookOpen className="mx-auto mb-4 text-gray-500" size={48} />
-          <p className="text-lg font-semibold mb-2">
+        <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-8 sm:p-12 backdrop-blur-md text-center">
+          <BookOpen className="mx-auto mb-4 text-gray-500" size={40} />
+          <p className="text-base sm:text-lg font-semibold mb-2">
             {searchTerm ? "No courses match your search" : "No Courses Found"}
           </p>
-          <p className="text-gray-400">
+          <p className="text-gray-400 text-xs sm:text-sm">
             {searchTerm
               ? "Try adjusting your search terms."
               : "You have not been enrolled in any courses yet."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredCourses.map((course) => (
             <div
               key={course.id}
-              className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-6 backdrop-blur-md hover:border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all duration-300"
+              className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md hover:border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all duration-300"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="bg-blue-500/20 p-3 rounded-lg border border-blue-500/30">
-                  <BookOpen className="text-blue-400" size={24} />
+                <div className="bg-blue-500/20 p-2.5 sm:p-3 rounded-lg border border-blue-500/30">
+                  <BookOpen className="text-blue-400" size={20} />
                 </div>
-                <span className="px-3 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-full text-xs font-medium">
+                <span className="px-2.5 sm:px-3 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-full text-xs font-medium">
                   {course.semester?.name || "Active"}
                 </span>
               </div>
 
-              <h2 className="text-lg font-semibold text-white mb-3 line-clamp-2">
+              <h2 className="text-base sm:text-lg font-semibold text-white mb-3 line-clamp-2 min-h-[3rem]">
                 {course.name}
               </h2>
 
-              <div className="space-y-2 text-sm text-gray-400 mb-4">
+              <div className="space-y-2 text-xs sm:text-sm text-gray-400 mb-4">
                 <div className="flex items-center gap-2">
-                  <User size={16} className="text-gray-500" />
-                  <span>{course.teacher?.user?.name || "Not assigned"}</span>
+                  <User size={14} className="text-gray-500 flex-shrink-0" />
+                  <span className="truncate">{course.teacher?.user?.name || "Not assigned"}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Hash size={16} className="text-gray-500" />
+                  <Hash size={14} className="text-gray-500 flex-shrink-0" />
                   <span className="font-mono bg-[#0a0a0a] px-2 py-0.5 rounded border border-white/10">
                     {course.entryCode}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-500" />
-                  <span>{course.semester?.academicYear?.name || "N/A"}</span>
+                  <Calendar size={14} className="text-gray-500 flex-shrink-0" />
+                  <span className="truncate">{course.semester?.academicYear?.name || "N/A"}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Users size={16} className="text-gray-500" />
+                  <Users size={14} className="text-gray-500 flex-shrink-0" />
                   <span>{course._count?.students || 0} students enrolled</span>
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-white/10 flex gap-3">
+              <div className="mt-4 pt-4 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => handleViewDetails(course.id)}
-                  className="flex-1 px-4 py-2 bg-[#0a0a0a] rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] text-sm font-medium"
+                  className="flex-1 px-3 sm:px-4 py-2 bg-[#0a0a0a] rounded-lg hover:bg-[#141414] transition-all text-xs sm:text-sm font-medium"
                 >
                   View Details
                 </button>
                 <button
                   onClick={() => handleViewAttendance(course.id)}
-                  className="px-4 py-2 bg-[#0a0a0a] border border-white/10 text-gray-300 rounded-lg hover:border-blue-500/40 hover:text-white transition-all text-sm font-medium"
+                  className="px-3 sm:px-4 py-2 bg-[#0a0a0a] border border-white/10 text-gray-300 rounded-lg hover:border-blue-500/40 hover:text-white transition-all text-xs sm:text-sm font-medium sm:flex-shrink-0"
                 >
                   Attendance
                 </button>

@@ -11,6 +11,8 @@ import {
   BarChart3,
   LogOut,
   GraduationCap,
+  Menu,
+  X,
 } from "lucide-react";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +20,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [role, setRole] = useState<string | null>(null);
   const [teacherName, setTeacherName] = useState<string>("Teacher");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -37,6 +40,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       .catch(() => router.push("/login"));
   }, [router]);
 
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   if (role !== "TEACHER") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0e0e0e] text-white">
@@ -55,10 +63,46 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex min-h-screen bg-[#0e0e0e] text-white font-[Poppins]">
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#141414]/95 backdrop-blur-md border-b border-white/10 px-4 py-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <GraduationCap size={20} />
+            <span>Teacher</span>
+          </h2>
+          <p className="text-xs text-gray-400">{teacherName}</p>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+        >
+          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/60 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 h-screen sticky top-0 bg-[#141414]/90 backdrop-blur-md border-r border-white/10 shadow-[0_0_25px_rgba(255,255,255,0.05)] flex flex-col">
+      <aside
+        className={`
+          fixed lg:sticky top-0 left-0 z-40
+          w-64 h-screen
+          bg-[#141414]/90 backdrop-blur-md border-r border-white/10 
+          shadow-[0_0_25px_rgba(255,255,255,0.05)] 
+          flex flex-col
+          transition-transform duration-300 ease-in-out
+          lg:translate-x-0
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
         {/* Header */}
-        <div className="p-6 border-b border-white/10 text-center">
+        <div className="p-6 border-b border-white/10 text-center mt-14 lg:mt-0">
           <h2 className="text-lg font-semibold tracking-wide flex items-center justify-center gap-2">
             <GraduationCap className="text-gray-100" size={20} />
             <span className="text-gray-100">Teacher Portal</span>
@@ -108,9 +152,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-[#0e0e0e]">
-        <div className="p-8">
-          <div className="bg-[#1a1a1a]/60 backdrop-blur-md border border-white/10 rounded-2xl shadow-[0_0_25px_rgba(255,255,255,0.05)] p-8 transition-all duration-300 space-y-6">
+      <main className="flex-1 overflow-y-auto bg-[#0e0e0e] mt-14 lg:mt-0">
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="bg-[#1a1a1a]/60 backdrop-blur-md border border-white/10 rounded-2xl shadow-[0_0_25px_rgba(255,255,255,0.05)] p-4 sm:p-6 lg:p-8 transition-all duration-300 space-y-6">
             {children}
           </div>
         </div>
