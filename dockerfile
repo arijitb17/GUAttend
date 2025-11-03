@@ -72,5 +72,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
 
+# 🧠 Preload the InsightFace model once before serving (fixes lazy protobuf issue)
+RUN python -c "from insightface.app import FaceAnalysis; app = FaceAnalysis(); app.prepare(ctx_id=0); print('InsightFace model cached successfully.')"
+
 # Start application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
