@@ -39,6 +39,9 @@ RUN pip install protobuf==3.20.3
 # Copy requirements and install
 COPY requirements.txt .
 
+# ✅ Copy environment file into container
+COPY .env .env
+
 # Install remaining dependencies one by one to avoid conflicts
 RUN pip install --no-cache-dir \
     fastapi==0.109.0 \
