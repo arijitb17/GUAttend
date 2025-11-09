@@ -96,9 +96,9 @@ export default function DepartmentsPage() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-[#1f1f1f]/80 border border-white/10 hover:bg-[#2a2a2a] text-white rounded-lg font-medium transition-all duration-200 w-full sm:w-auto text-sm sm:text-base"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg font-medium transition-all duration-200 w-full sm:w-auto text-sm sm:text-base"
         >
-          <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+          <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
           Add Department
         </button>
       </div>
@@ -137,7 +137,7 @@ export default function DepartmentsPage() {
               <button
                 onClick={addDepartment}
                 disabled={loading || !newDept.trim()}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg font-medium transition-all duration-200 text-sm sm:text-base disabled:bg-gray-200 disabled:text-gray-600 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
@@ -163,7 +163,7 @@ export default function DepartmentsPage() {
             <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             All Departments
           </h2>
-          <span className="text-xs sm:text-sm text-gray-300 bg-[#1f1f1f] px-3 py-1 rounded-full border border-white/10">
+          <span className="text-xs sm:text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200">
             {departments.length}
           </span>
         </div>
@@ -173,7 +173,7 @@ export default function DepartmentsPage() {
             <div className="text-center py-12">
               <Building2 className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500 mx-auto mb-4" />
               <p className="text-gray-400 text-base sm:text-lg">No departments found</p>
-              <p className="text-gray-500 text-sm sm:text-base">
+              <p className="text-gray-600 text-sm sm:text-base">
                 Add your first department to get started
               </p>
             </div>
@@ -190,25 +190,25 @@ export default function DepartmentsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-white text-sm sm:text-base">{dept.name}</h3>
-                      <p className="text-xs sm:text-sm text-gray-500">
+                      <p className="text-xs sm:text-sm text-gray-600">
                         Programs: {dept._count?.programs ?? 0}
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-500">
+                      <p className="text-xs sm:text-sm text-gray-600">
                         Teachers: {dept._count?.teachers ?? 0}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition">
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg transition">
                       <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                       Edit
                     </button>
                     <button
                       onClick={() => deleteDepartment(dept.id, dept.name)}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg transition"
                     >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
                       Delete
                     </button>
                   </div>
@@ -225,7 +225,7 @@ export default function DepartmentsPage() {
         <div className="bg-[#141414]/80 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-wide">
+              <p className="text-xs sm:text-sm text-gray-600 uppercase tracking-wide">
                 Total Departments
               </p>
               <p className="text-xl sm:text-2xl font-bold mt-1">{departments.length}</p>
@@ -240,7 +240,7 @@ export default function DepartmentsPage() {
         <div className="bg-[#141414]/80 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-wide">
+              <p className="text-xs sm:text-sm text-gray-600 uppercase tracking-wide">
                 Active Programs
               </p>
               <p className="text-xl sm:text-2xl font-bold mt-1">
@@ -260,7 +260,7 @@ export default function DepartmentsPage() {
         <div className="bg-[#141414]/80 backdrop-blur-md border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-wide">
+              <p className="text-xs sm:text-sm text-gray-600 uppercase tracking-wide">
                 Faculty Members
               </p>
               <p className="text-xl sm:text-2xl font-bold mt-1">

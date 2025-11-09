@@ -52,27 +52,31 @@ export default function AdminOverview() {
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-gray-400 mt-2">Here's a quick look at your institution's insights.</p>
       </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+{/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {statCards.map((card) => (
           <div
             key={card.title}
-            className="bg-[#141414]/80 backdrop-blur-md border border-white/10 rounded-2xl p-6 
-                       hover:bg-[#1f1f1f]/90 hover:shadow-[0_0_25px_rgba(255,255,255,0.05)] transition-all duration-300"
+            className="bg-[#141414]/80 backdrop-blur-md border border-white/10 rounded-2xl 
+            p-4 sm:p-5 lg:p-6 hover:bg-[#1f1f1f]/90 hover:shadow-[0_0_25px_rgba(255,255,255,0.05)] 
+            transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400 uppercase tracking-wide">{card.title}</p>
-                <p className="text-3xl font-semibold mt-2 text-white">
+                <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wide">
+                  {card.title}
+                </p>
+                <p className="text-lg sm:text-2xl lg:text-3xl font-semibold mt-1 text-white">
                   {loading ? (
-                    <span className="animate-pulse bg-gray-700 h-7 w-16 rounded inline-block" />
+                    <span className="animate-pulse bg-gray-700 h-5 sm:h-6 w-10 sm:w-14 rounded inline-block" />
                   ) : (
                     card.value
                   )}
                 </p>
               </div>
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10">{card.icon}</div>
+              <div className="bg-white/5 p-2 sm:p-3 rounded-xl border border-white/10">
+                <div className="scale-90 sm:scale-100">{card.icon}</div>
+              </div>
             </div>
           </div>
         ))}

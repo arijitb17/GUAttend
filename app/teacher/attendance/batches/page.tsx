@@ -10,21 +10,25 @@ interface Student {
   hasFaceData: boolean;
 }
 
+interface RecognitionStudent {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface RecognitionDetection {
+  imageIndex: number;
+  faceIndex: number;
+  bbox?: number[];
+  confidence: number;
+  studentId: string | null;
+}
+
 interface RecognitionResult {
   totalFaces: number;
-  recognizedStudents: Array<{
-    id: string;
-    name: string;
-    email: string;
-  }>;
+  recognizedStudents: RecognitionStudent[];
   averageConfidence: number;
-  detections: Array<{
-    imageIndex: number;
-    faceIndex: number;
-    bbox: number[];
-    confidence: number;
-    studentId: string | null;
-  }>;
+  detections: RecognitionDetection[];
 }
 
 interface AttendanceHistory {
@@ -212,41 +216,197 @@ export default function AttendanceCapturePage() {
     }
   }
 
-  async function recognizeFaces(frames: Blob[]) {
-    if (!courseId) return;
+async function recognizeFaces(frames: Blob[]) {
+  if (!courseId) return;
 
-    try {
-      setRecognizing(true);
+  try {
+    setRecognizing(true);
 
-      const formData = new FormData();
-      formData.append("courseId", courseId);
-      formData.append("batchId", `batch_${Date.now()}`);
+    const formData = new FormData();
+    formData.append("courseId", courseId);
+    formData.append("batchId", `batch_${Date.now()}`);
 
-      frames.forEach((frame, index) => {
-        formData.append("frames", frame, `frame_${index}.jpg`);
-      });
+    frames.forEach((frame, index) => {
+      formData.append("frames", frame, `frame_${index}.jpg`);
+    });
 
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/teacher/attendance?operation=recognize", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+    const token = localStorage.getItem("token");
+    const res = await fetch("/api/teacher/attendance?operation=recognize", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
 
-      if (res.ok) {
-        const result = await res.json();
-        setRecognitionResult(result);
-      } else {
-        const error = await res.json();
-        alert(`Recognition failed: ${error.error || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Recognition error:", error);
-      alert("Failed to recognize faces. Please ensure training is complete.");
-    } finally {
-      setRecognizing(false);
+    if (!res.ok) {
+      const error = await res.json();
+      alert(`Recognition failed: ${error.error || "Unknown error"}`);
+      return;
     }
+
+    const result = await res.json();
+    console.log("RAW /api/recognize response:", result);
+    console.log("Loaded students (before normalize):", students);
+
+    // if no students loaded yet, fetch them
+    if ((!students || students.length === 0) && typeof fetchStudents === "function") {
+      try {
+        await fetchStudents(courseId);
+        console.log("Fetched students for normalization:", students);
+      } catch (e) {
+        console.warn("fetchStudents failed during normalization:", e);
+      }
+    }
+
+    // helper to match recognized IDs to known students
+    function findStudentByCandidate(candidate: string | null | undefined) {
+      if (!candidate) return null;
+      const s = String(candidate).trim();
+      let found =
+        students.find(st => st.id === s) ||
+        students.find(st => st.id.toLowerCase() === s.toLowerCase()) ||
+        students.find(st => (st.name || "").toLowerCase() === s.toLowerCase()) ||
+        students.find(st => (st.email || "").toLowerCase() === s.toLowerCase()) ||
+        students.find(
+          st =>
+            (st.id || "").toLowerCase().includes(s.toLowerCase()) ||
+            (st.name || "").toLowerCase().includes(s.toLowerCase()) ||
+            (st.email || "").toLowerCase().includes(s.toLowerCase())
+        );
+      return found || null;
+    }
+
+    // normalize recognized students
+    const rawRec = result.recognizedStudents || [];
+    const normalized: RecognitionStudent[] = rawRec.map((item: any, idx: number) => {
+      console.log(`recognizedStudents[${idx}] raw:`, item);
+
+      if (!item) return { id: "unknown", name: "unknown", email: "" };
+
+      // case 1: backend returned a string ID
+      if (typeof item === "string") {
+        const idStr = item.trim();
+        const found = findStudentByCandidate(idStr);
+        if (found) return { id: found.id, name: found.name, email: found.email };
+        console.warn("Unmatched recognized ID:", idStr);
+        return { id: idStr, name: idStr, email: "" };
+      }
+
+      // case 2: backend returned object
+      if (typeof item === "object") {
+        const possibleFields = [
+          item.id,
+          item.studentId,
+          item.student_id,
+          item.name,
+          item.studentName,
+          item.displayName,
+          item.email,
+          item.studentEmail,
+        ].filter(Boolean);
+
+        for (const cand of possibleFields) {
+          const found = findStudentByCandidate(cand);
+          if (found) return { id: found.id, name: found.name, email: found.email };
+        }
+
+        const fallbackId = item.id ?? item.studentId ?? "unknown";
+        const fallbackName = item.name ?? item.studentName ?? String(fallbackId);
+        const fallbackEmail = item.email ?? item.studentEmail ?? "";
+        return { id: String(fallbackId), name: String(fallbackName), email: String(fallbackEmail) };
+      }
+
+      // fallback for unexpected type
+      return { id: String(item), name: String(item), email: "" };
+    });
+
+    // normalize detections
+    const rawDetections: any[] = result.detections || [];
+    const normalizedDetections: RecognitionDetection[] = rawDetections.map((d: any) => ({
+      imageIndex: d.imageIndex ?? d.frameIndex ?? 0,
+      faceIndex: d.faceIndex ?? 0,
+      bbox: d.bbox ?? undefined,
+      confidence:
+        typeof d.confidence === "number"
+          ? d.confidence
+          : parseFloat(d.confidence) || 0,
+      studentId: d.studentId ?? d.id ?? null,
+    }));
+
+    // preliminary result
+    const normalizedResult: RecognitionResult = {
+      totalFaces: Number(result.totalFaces ?? normalizedDetections.length ?? 0),
+      recognizedStudents: normalized,
+      averageConfidence:
+        typeof result.averageConfidence === "number"
+          ? result.averageConfidence
+          : parseFloat(result.averageConfidence) || 0,
+      detections: normalizedDetections,
+    };
+
+    // ✅ resolve missing names (call backend only if needed)
+    const missingIds = normalized
+      .filter(s => s && (!s.name || s.name === s.id))
+      .map(s => s.id)
+      .filter(id => id && id !== "unknown");
+
+    if (missingIds.length > 0) {
+      console.log("Resolving missing IDs from backend:", missingIds);
+      try {
+        const token = localStorage.getItem("token");
+        const resp = await fetch("/api/teacher/attendance?operation=resolve-ids", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ids: missingIds }),
+        });
+
+        if (resp.ok) {
+  // Explicitly tell TypeScript the JSON structure
+  const resolved = (await resp.json()) as Array<{ id: string; name?: string; email?: string }>;
+
+  // Create a map from ID → student object
+  const map = new Map(resolved.map((r) => [r.id, r]));
+
+  // Merge resolved data into normalized array
+  const merged = normalized.map((s) => {
+    const r = map.get(s.id);
+    if (r) {
+      return {
+        id: r.id,
+        name: r.name || s.id,
+        email: r.email || "",
+      };
+    }
+    return s;
+  });
+
+          const mergedResult = { ...normalizedResult, recognizedStudents: merged };
+          console.log("✅ Merged recognitionResult (with resolved IDs):", mergedResult);
+          setRecognitionResult(mergedResult);
+          return;
+        } else {
+          console.warn("resolve-ids request failed; using fallback normalized data");
+        }
+      } catch (e) {
+        console.warn("resolve-ids call error:", e);
+      }
+    }
+
+    // fallback: just use normalized result
+    console.log("✅ Normalized recognitionResult (set to state):", normalizedResult);
+    setRecognitionResult(normalizedResult);
+
+  } catch (error) {
+    console.error("Recognition error:", error);
+    alert("Failed to recognize faces. Please ensure training is complete.");
+  } finally {
+    setRecognizing(false);
   }
+}
+
+
 
   async function submitAttendance() {
     if (!recognitionResult || !courseId) return;

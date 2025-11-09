@@ -103,15 +103,15 @@ export default function ProgramsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-100">Programs</h1>
-          <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
+          <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
             Manage academic programs and degree offerings
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] hover:bg-[#222] text-white rounded-lg font-medium border border-white/10 hover:shadow-[0_0_15px_rgba(255,255,255,0.08)] transition-all duration-200 w-full sm:w-auto justify-center text-sm sm:text-base"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg font-medium transition-all duration-200 w-full sm:w-auto justify-center text-sm sm:text-base"
         >
-          <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+          <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
           Add Program
         </button>
       </div>
@@ -121,7 +121,7 @@ export default function ProgramsPage() {
         <div className="bg-[#141414]/80 border border-white/10 rounded-xl p-4 sm:p-6 shadow-md backdrop-blur-sm">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-100 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300" />
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
               Add New Program
             </h2>
             <button
@@ -134,24 +134,24 @@ export default function ProgramsPage() {
 
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-600 mb-2">
                 Program Name
               </label>
               <input
                 type="text"
                 placeholder="e.g., Bachelor of Computer Science"
-                className="w-full px-3 py-2 bg-transparent border border-white/20 rounded-lg text-gray-100 focus:ring-2 focus:ring-white/20 focus:outline-none text-sm sm:text-base"
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-600 mb-2">
                 Department
               </label>
               <select
-                className="w-full px-3 py-2 bg-transparent border border-white/20 rounded-lg text-gray-100 focus:ring-2 focus:ring-white/20 focus:outline-none text-sm sm:text-base"
+                className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm sm:text-base"
                 value={departmentId}
                 onChange={(e) => setDepartmentId(e.target.value)}
               >
@@ -172,14 +172,14 @@ export default function ProgramsPage() {
           <div className="flex flex-col sm:flex-row justify-end gap-2 mt-6">
             <button
               onClick={() => setShowForm(false)}
-              className="w-full sm:w-auto px-4 py-2 text-gray-300 border border-white/10 rounded-lg hover:bg-white/5 transition-all text-sm sm:text-base"
+              className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg transition-all text-sm sm:text-base"
             >
               Cancel
             </button>
             <button
               onClick={addProgram}
               disabled={loading || !name.trim() || !departmentId.trim()}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded-lg font-medium transition-all text-sm sm:text-base"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg font-medium transition-all text-sm sm:text-base disabled:bg-gray-200 disabled:text-gray-600 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -201,10 +201,10 @@ export default function ProgramsPage() {
       <div className="bg-[#141414]/80 border border-white/10 rounded-xl shadow-md backdrop-blur-sm">
         <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-100 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300" />
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             All Programs
           </h2>
-          <span className="text-xs sm:text-sm text-gray-400 bg-white/10 px-3 py-1 rounded-full">
+          <span className="text-xs sm:text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200">
             {programs.length}
           </span>
         </div>
@@ -214,7 +214,7 @@ export default function ProgramsPage() {
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-gray-700 mx-auto mb-4" />
               <p className="text-gray-400 text-base sm:text-lg">No programs found</p>
-              <p className="text-gray-500 text-sm sm:text-base">
+              <p className="text-gray-600 text-sm sm:text-base">
                 Add your first program to get started
               </p>
             </div>
@@ -251,16 +251,15 @@ export default function ProgramsPage() {
                   </div>
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-white/10 text-gray-300 rounded-lg hover:bg-white/20 transition">
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg transition">
                       <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span className="sm:inline">Edit</span>
                     </button>
                     <button
                       onClick={() => deleteProgram(program.id, program.name)}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1 text-xs sm:text-sm bg-white border border-gray-200 hover:bg-gray-100 text-black rounded-lg transition"
                     >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                      <span className="sm:inline">Delete</span>
+                      c
                     </button>
                   </div>
                 </div>
@@ -294,7 +293,7 @@ export default function ProgramsPage() {
             className="bg-[#141414]/80 border border-white/10 rounded-xl p-4 sm:p-6 shadow-sm flex items-center justify-between hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition"
           >
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-400 uppercase tracking-wide">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wide">
                 {stat.title}
               </p>
               <p className="text-xl sm:text-2xl font-bold text-gray-100 mt-1">

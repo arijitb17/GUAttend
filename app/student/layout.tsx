@@ -135,19 +135,20 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-white/10 mt-auto">
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              router.push("/login");
-            }}
-            className="w-full px-4 py-2 text-sm text-red-400 border border-red-500/30 rounded-lg 
-                     hover:bg-red-500/20 hover:text-white transition-all duration-300 flex items-center justify-center gap-2"
-          >
-            <LogOut size={16} className="text-red-400" /> Logout
-          </button>
-        </div>
+        {/* FIXED Logout Button */}
+<div className="p-4 border-t border-white/10 sticky bottom-0 bg-[#141414]/90 backdrop-blur-md">
+  <button
+    onClick={() => {
+      localStorage.removeItem("token");
+      router.push("/login");
+    }}
+    className="w-full px-4 py-2 text-sm text-red-400 border border-red-500/30 rounded-lg 
+             hover:bg-red-500/20 hover:text-white transition-all duration-300 flex items-center justify-center gap-2"
+  >
+    <LogOut size={16} className="text-red-400" /> Logout
+  </button>
+</div>
+
       </aside>
 
       {/* Main Content */}
