@@ -5,6 +5,29 @@ import type { JwtPayload } from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
+// 🔹 Helper: derive short department code from department name
+function getDeptCode(deptName?: string | null): string {
+  if (!deptName) return "GEN";
+
+  const stopWords = ["and", "of", "department", "dept.", "dept"];
+  const words = deptName
+    .split(/\s+/)
+    .filter((w) => !stopWords.includes(w.toLowerCase()));
+
+  if (words.length === 0) return "GEN";
+
+  if (words.length === 1) {
+    const w = words[0].replace(/[^a-zA-Z]/g, "");
+    if (w.length >= 3) return w.slice(0, 3).toUpperCase();
+    return w.toUpperCase();
+  }
+
+  return words
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
 export async function GET(req: Request) {
   try {
     const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -25,7 +48,11 @@ export async function GET(req: Request) {
           include: {
             academicYear: {
               include: {
-                program: true,
+                program: {
+                  include: {
+                    department: true,
+                  },
+                },
               },
             },
           },
@@ -52,7 +79,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const { name, teacherId, programId, academicYear, semesterNumber } = await req.json();
+    const { name, teacherId, programId, academicYear, semesterNumber } =
+      await req.json();
+
+    if (!name || !teacherId || !programId || !academicYear || !semesterNumber) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
 
     console.log("🔍 Looking for teacher with ID:", teacherId);
 
@@ -72,14 +107,17 @@ export async function POST(req: Request) {
       });
 
       console.error("❌ Teacher not found with ID:", teacherId);
-      console.log("All teachers in DB:", await prisma.teacher.findMany({
-        select: { id: true, userId: true },
-      }));
+      console.log(
+        "All teachers in DB:",
+        await prisma.teacher.findMany({
+          select: { id: true, userId: true },
+        })
+      );
 
       if (user) {
         console.error("⚠️ This ID exists as a User, not a Teacher!");
         console.log("User details:", user);
-        
+
         // Try to find the teacher record for this user
         const teacherByUserId = await prisma.teacher.findUnique({
           where: { userId: teacherId },
@@ -88,8 +126,9 @@ export async function POST(req: Request) {
         if (teacherByUserId) {
           console.log("✅ Found Teacher record by userId:", teacherByUserId);
           return NextResponse.json(
-            { 
-              error: "Teacher ID mismatch. Frontend is sending userId instead of teacherId.",
+            {
+              error:
+                "Teacher ID mismatch. Frontend is sending userId instead of teacherId.",
               hint: `Use teacherId: ${teacherByUserId.id} instead of ${teacherId}`,
             },
             { status: 400 }
@@ -104,6 +143,30 @@ export async function POST(req: Request) {
     }
 
     console.log("✅ Found teacher:", teacher.user.name);
+
+    // 🔹 Validate / normalize semesterNumber
+    const semNum = parseInt(semesterNumber, 10);
+    if (Number.isNaN(semNum) || semNum <= 0) {
+      return NextResponse.json(
+        { error: "Invalid semester number" },
+        { status: 400 }
+      );
+    }
+
+    // 🔹 Get program + department (for department code)
+    const program = await prisma.program.findUnique({
+      where: { id: programId },
+      include: { department: true },
+    });
+
+    if (!program || !program.department) {
+      return NextResponse.json(
+        { error: "Program or department not found" },
+        { status: 404 }
+      );
+    }
+
+    const deptCode = getDeptCode(program.department.name); // e.g. "IT"
 
     // Find or create academic year
     let academicYearRecord = await prisma.academicYear.findFirst({
@@ -123,7 +186,7 @@ export async function POST(req: Request) {
     }
 
     // Find or create semester
-    const semesterName = `Semester ${semesterNumber}`;
+    const semesterName = `Semester ${semNum}`;
     let semesterRecord = await prisma.semester.findFirst({
       where: {
         name: semesterName,
@@ -140,10 +203,24 @@ export async function POST(req: Request) {
       });
     }
 
-    // Create course
+    // 🔹 Generate course code: IT-701, IT-702, ...
+    const existingCoursesCount = await prisma.course.count({
+      where: {
+        semesterId: semesterRecord.id,
+      },
+    });
+
+    const index = existingCoursesCount + 1; // 1-based
+    const indexPart = String(index).padStart(2, "0"); // 01, 02, 03...
+    const courseCode = `${deptCode}-${semNum}${indexPart}`; // e.g. IT-701
+
+    console.log("🆕 Generated course code:", courseCode);
+
+    // Create course (with code + random entryCode)
     const course = await prisma.course.create({
       data: {
         name,
+        code: courseCode,
         entryCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
         teacherId: teacher.id,
         semesterId: semesterRecord.id,
@@ -158,7 +235,11 @@ export async function POST(req: Request) {
           include: {
             academicYear: {
               include: {
-                program: true,
+                program: {
+                  include: {
+                    department: true,
+                  },
+                },
               },
             },
           },

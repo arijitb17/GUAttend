@@ -1,39 +1,72 @@
 @import "tailwindcss";
 
+/* ================================
+   THEME VARIABLES
+================================ */
 :root {
-  /* --- Elegant Black & White Theme --- */
-  --background: #0e0e0e;    /* deep charcoal black */
-  --foreground: #f5f5f5;    /* soft white for text */
+  --background: #0e0e0e;    /* deep black */
+  --foreground: #f5f5f5;    /* default soft white */
+  --card: #1a1a1a;
+  --card-border: #2e2e2e;
 
-  --card: #1a1a1a;          /* slightly lighter black for cards */
-  --card-border: #2e2e2e;   /* subtle border for depth */
+  --primary: #ffffff;
+  --secondary: #b0b0b0;
+  --accent: #9b9b9b;
 
-  --primary: #ffffff;       /* bright white for important actions */
-  --secondary: #b0b0b0;     /* muted gray for subtext */
-  --accent: #9b9b9b;        /* neutral accent for highlights */
+  --text-black: #000000;
+  --text-dark: #1a1a1a;
+  --text-white: #ffffff;
 }
 
+/* Tailwind inline theme */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-border: var(--card-border);
+
   --color-primary: var(--primary);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
 
   --font-sans: "Poppins", sans-serif;
-  --font-mono: "Geist Mono", monospace;
 }
 
+/* ================================
+   GLOBAL BODY
+================================ */
 body {
   background-color: var(--background);
-  color: var(--foreground);
   font-family: var(--font-sans);
   transition: all 0.3s ease-in-out;
 }
 
-/* --- Card design --- */
+/* ================================
+   TEXT UTILITIES (GLOBAL)
+================================ */
+.text-black {
+  color: var(--text-black) !important;
+}
+
+.text-dark {
+  color: var(--text-dark) !important;
+}
+
+.text-white {
+  color: var(--text-white) !important;
+}
+
+.text-secondary {
+  color: var(--secondary) !important;
+}
+
+.text-accent {
+  color: var(--accent) !important;
+}
+
+/* ================================
+   CARD STYLING
+================================ */
 .card {
   background-color: var(--card);
   border: 1px solid var(--card-border);
@@ -48,23 +81,11 @@ body {
   box-shadow: 0 8px 25px rgba(255, 255, 255, 0.1);
 }
 
-/* --- Buttons --- */
-button {
-  background-color: var(--primary);
-  color: var(--background);
-  padding: 0.6rem 1.2rem;
-  border-radius: 9999px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  cursor: pointer; /* ✅ Always show pointer for buttons */
-}
+/* ================================
+   BUTTONS (GLOBAL)
+================================ */
 
-button:hover {
-  background-color: var(--foreground);
-  color: var(--background);
-}
-
-/* --- Buttons (excluding custom) --- */
+/* Default button style (except custom-btn) */
 button:not(.custom-btn) {
   background-color: var(--primary);
   color: var(--background);
@@ -72,20 +93,22 @@ button:not(.custom-btn) {
   border-radius: 9999px;
   font-weight: 600;
   transition: all 0.3s ease;
-  cursor: pointer; /* ✅ Pointer for non-custom buttons */
+  cursor: pointer !important; /* ⬅ cursor always pointer */
 }
 
 button:not(.custom-btn):hover {
   background-color: var(--foreground);
   color: var(--background);
-  cursor: pointer; /* ✅ Ensure hover pointer */
+  cursor: pointer !important; /* ⬅ keep pointer on hover */
 }
 
-/* --- Subtext & accents --- */
-.text-secondary {
-  color: var(--secondary);
+/* Ensure ALL buttons behave like buttons */
+button,
+.custom-btn {
+  cursor: pointer !important; /* ⬅ global enforcement */
 }
 
-.text-accent {
-  color: var(--accent);
+/* Custom black buttons (Tailwind overrides allowed) */
+.custom-btn:hover {
+  cursor: pointer !important;
 }

@@ -11,10 +11,13 @@ import {
   Users,
   GraduationCap,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Course {
   id: string;
   name: string;
+  code: string; // 👈 IT-701 from DB
   entryCode: string;
   teacher: {
     user: {
@@ -28,6 +31,9 @@ interface Course {
       name: string;
       program: {
         name: string;
+        department?: {
+          name: string;
+        };
       };
     };
   };
@@ -35,6 +41,32 @@ interface Course {
     students: number;
     attendance: number;
   };
+}
+
+const STAT_STYLES = [
+  {
+    bg: "from-sky-400/30 via-sky-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-sky-500 to-indigo-400 shadow-[0_8px_20px_-4px_rgba(56,189,248,0.5)]",
+  },
+  {
+    bg: "from-emerald-400/30 via-emerald-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-emerald-500 to-lime-400 shadow-[0_8px_20px_-4px_rgba(16,185,129,0.4)]",
+  },
+  {
+    bg: "from-purple-400/30 via-purple-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-purple-500 to-pink-400 shadow-[0_8px_20px_-4px_rgba(168,85,247,0.4)]",
+  },
+];
+
+// slug from name
+function slugifyCourseName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 export default function MyCoursesPage() {
@@ -51,51 +83,70 @@ export default function MyCoursesPage() {
   async function fetchCourses() {
     try {
       setError(null);
-      const token = localStorage.getItem("token");
+      setLoading(true);
+
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       if (!token) {
         setError("Not authenticated. Please log in.");
-        setLoading(false);
         return;
       }
+
       const res = await fetch("/api/student/courses", {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (res.ok) {
         const data = await res.json();
         setCourses(data);
       } else {
         const errorData = await res.json();
-        setError(errorData.error || "Failed to fetch courses");
+        setError(errorData.error || "Failed to fetch courses.");
       }
-    } catch (error) {
-      console.error("Failed to fetch courses:", error);
-      setError("An error occurred while fetching courses");
+    } catch (err) {
+      console.error("Failed to fetch courses:", err);
+      setError("An error occurred while fetching courses.");
     } finally {
       setLoading(false);
     }
   }
 
-  const filteredCourses = courses.filter(
-    (course) =>
-      course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.teacher?.user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.entryCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCourses = courses.filter((course) => {
+    const term = searchTerm.toLowerCase();
 
-  function handleViewDetails(courseId: string) {
-    router.push(`/student/courses/${courseId}`);
+    return (
+      course.name.toLowerCase().includes(term) ||
+      course.teacher?.user?.name.toLowerCase().includes(term) ||
+      course.entryCode.toLowerCase().includes(term) ||
+      course.code.toLowerCase().includes(term) || // 👈 search by code
+      course.semester.academicYear.program.name.toLowerCase().includes(term) ||
+      course.semester.academicYear.program.department?.name
+        ?.toLowerCase()
+        .includes(term)
+    );
+  });
+
+  function buildSlug(course: Course) {
+    const nameSlug = slugifyCourseName(course.name);
+    return `${course.code}-${nameSlug}`; // e.g. IT-701-data-structures
   }
 
-  function handleViewAttendance(courseId: string) {
-    router.push(`/student/courses/${courseId}?tab=attendance`);
+  function handleViewDetails(course: Course) {
+    const slug = buildSlug(course);
+    router.push(`/student/courses/${slug}`);
+  }
+
+  function handleViewAttendance(course: Course) {
+    const slug = buildSlug(course);
+    router.push(`/student/courses/${slug}?tab=attendance`);
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading your courses...</p>
+      <div className="flex items-center justify-center py-24 text-slate-700">
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900 mx-auto" />
+          <p className="text-sm text-slate-500">Loading your courses...</p>
         </div>
       </div>
     );
@@ -103,146 +154,218 @@ export default function MyCoursesPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-white px-4">
-        <div className="text-center max-w-md w-full bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-          <div className="text-red-500 text-3xl mb-4">⚠️</div>
-          <p className="font-semibold mb-2 text-sm sm:text-base">Error Loading Courses</p>
-          <p className="text-gray-400 mb-4 text-xs sm:text-sm">{error}</p>
-          <button
-            onClick={fetchCourses}
-            className="px-4 sm:px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] text-sm sm:text-base"
-          >
-            Try Again
-          </button>
-        </div>
+      <div className="flex items-center justify-center py-24">
+        <Card className="max-w-md w-full border border-red-200 bg-red-50/70 shadow-[0_8px_30px_rgba(220,38,38,0.15)]">
+          <CardContent className="pt-6 pb-5 space-y-4 text-center">
+            <div className="text-3xl">⚠️</div>
+            <div>
+              <p className="font-semibold text-slate-900 mb-1">
+                Error loading courses
+              </p>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+            <Button onClick={fetchCourses} className="mt-2 px-6" variant="default">
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  const totalSessions = courses.reduce(
+    (sum, c) => sum + (c._count?.attendance || 0),
+    0
+  );
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto text-white">
+    <div className="space-y-8 text-slate-900">
       {/* Header */}
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">My Courses</h1>
-        <p className="text-gray-400 mt-2 text-sm sm:text-base">
-          View your enrolled courses and track your progress.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight flex items-center gap-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white text-xl shadow-[0_4px_10px_rgba(0,0,0,0.35)]">
+              <BookOpen size={20} />
+            </span>
+            <span>My Courses</span>
+          </h1>
+          <p className="text-sm md:text-base text-slate-600 mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
+            View your enrolled courses and keep track of active sessions.
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
       {courses.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-400">Total Courses</p>
-              <p className="text-2xl sm:text-3xl font-bold text-white mt-1">{courses.length}</p>
-            </div>
-            <BookOpen className="text-blue-400" size={28} />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {/* Total Courses */}
+          <Card className="relative overflow-hidden border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+            <div
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${STAT_STYLES[0].bg} opacity-90`}
+            />
+            <CardContent className="relative p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                  Total Courses
+                </p>
+                <p className="text-3xl font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
+                  {courses.length}
+                </p>
+              </div>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-xl ${STAT_STYLES[0].iconBg} text-white`}
+              >
+                <BookOpen size={22} />
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-400">Active Semester</p>
-              <p className="text-base sm:text-lg font-semibold text-white mt-1 truncate">
-                {courses[0]?.semester?.name || "N/A"}
-              </p>
-            </div>
-            <Calendar className="text-green-400 flex-shrink-0" size={28} />
-          </div>
+          {/* Active Semester */}
+          <Card className="relative overflow-hidden border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+            <div
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${STAT_STYLES[1].bg} opacity-90`}
+            />
+            <CardContent className="relative p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                  Active Semester
+                </p>
+                <p className="text-base md:text-lg font-semibold mt-1 truncate max-w-[12rem] drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
+                  {courses[0]?.semester?.name || "N/A"}
+                </p>
+              </div>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-xl ${STAT_STYLES[1].iconBg} text-white`}
+              >
+                <Calendar size={22} />
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md flex justify-between items-center hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all sm:col-span-2 lg:col-span-1">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-400">Total Sessions</p>
-              <p className="text-2xl sm:text-3xl font-bold text-white mt-1">
-                {courses.reduce((sum, c) => sum + (c._count?.attendance || 0), 0)}
-              </p>
-            </div>
-            <GraduationCap className="text-purple-400" size={28} />
-          </div>
+          {/* Total Sessions */}
+          <Card className="relative overflow-hidden border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+            <div
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${STAT_STYLES[2].bg} opacity-90`}
+            />
+            <CardContent className="relative p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                  Total Sessions
+                </p>
+                <p className="text-3xl font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
+                  {totalSessions}
+                </p>
+              </div>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-xl ${STAT_STYLES[2].iconBg} text-white`}
+              >
+                <GraduationCap size={22} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Search */}
-      <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-3 sm:p-4 mb-6 sm:mb-8 backdrop-blur-md flex items-center gap-3">
-        <Search className="text-gray-400 flex-shrink-0" size={18} />
-        <input
-          type="text"
-          placeholder="Search courses, teachers, or entry codes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-transparent w-full outline-none text-white placeholder-gray-500 text-sm sm:text-base"
-        />
-      </div>
+      <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+        <CardContent className="p-3 md:p-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white shadow-[0_3px_8px_rgba(15,23,42,0.5)]">
+            <Search size={16} />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by course name, course code (e.g. IT-701), teacher, entry code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-transparent outline-none text-sm md:text-base text-slate-900 placeholder-slate-400"
+          />
+        </CardContent>
+      </Card>
 
       {/* Course Grid */}
       {filteredCourses.length === 0 ? (
-        <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-8 sm:p-12 backdrop-blur-md text-center">
-          <BookOpen className="mx-auto mb-4 text-gray-500" size={40} />
-          <p className="text-base sm:text-lg font-semibold mb-2">
-            {searchTerm ? "No courses match your search" : "No Courses Found"}
-          </p>
-          <p className="text-gray-400 text-xs sm:text-sm">
-            {searchTerm
-              ? "Try adjusting your search terms."
-              : "You have not been enrolled in any courses yet."}
-          </p>
-        </div>
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
+          <CardContent className="py-10 text-center space-y-3">
+            <BookOpen className="mx-auto text-slate-300" size={40} />
+            <p className="text-base md:text-lg font-semibold text-slate-900">
+              {searchTerm ? "No courses match your search" : "No courses found"}
+            </p>
+            <p className="text-sm text-slate-500 max-w-md mx-auto">
+              {searchTerm
+                ? "Try adjusting your search terms or clearing the filter."
+                : "You have not been enrolled in any courses yet."}
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredCourses.map((course) => (
-            <div
+            <Card
               key={course.id}
-              className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl p-4 sm:p-6 backdrop-blur-md hover:border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all duration-300"
+              className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(15,23,42,0.12)] hover:shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition-all duration-300"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="bg-blue-500/20 p-2.5 sm:p-3 rounded-lg border border-blue-500/30">
-                  <BookOpen className="text-blue-400" size={20} />
-                </div>
-                <span className="px-2.5 sm:px-3 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded-full text-xs font-medium">
-                  {course.semester?.name || "Active"}
-                </span>
-              </div>
-
-              <h2 className="text-base sm:text-lg font-semibold text-white mb-3 line-clamp-2 min-h-[3rem]">
-                {course.name}
-              </h2>
-
-              <div className="space-y-2 text-xs sm:text-sm text-gray-400 mb-4">
-                <div className="flex items-center gap-2">
-                  <User size={14} className="text-gray-500 flex-shrink-0" />
-                  <span className="truncate">{course.teacher?.user?.name || "Not assigned"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Hash size={14} className="text-gray-500 flex-shrink-0" />
-                  <span className="font-mono bg-[#0a0a0a] px-2 py-0.5 rounded border border-white/10">
-                    {course.entryCode}
+              <CardContent className="p-5 flex flex-col h-full">
+                {/* Top row */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-600 shadow-[0_4px_10px_rgba(56,189,248,0.5)]">
+                    <BookOpen size={18} />
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-medium">
+                    {course.semester?.name || "Active"}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-gray-500 flex-shrink-0" />
-                  <span className="truncate">{course.semester?.academicYear?.name || "N/A"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users size={14} className="text-gray-500 flex-shrink-0" />
-                  <span>{course._count?.students || 0} students enrolled</span>
-                </div>
-              </div>
 
-              <div className="mt-4 pt-4 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <button
-                  onClick={() => handleViewDetails(course.id)}
-                  className="flex-1 px-3 sm:px-4 py-2 bg-[#0a0a0a] rounded-lg hover:bg-[#141414] transition-all text-xs sm:text-sm font-medium"
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleViewAttendance(course.id)}
-                  className="px-3 sm:px-4 py-2 bg-[#0a0a0a] border border-white/10 text-gray-300 rounded-lg hover:border-blue-500/40 hover:text-white transition-all text-xs sm:text-sm font-medium sm:flex-shrink-0"
-                >
-                  Attendance
-                </button>
-              </div>
-            </div>
+                {/* Title */}
+                <h2 className="text-base md:text-lg font-semibold text-slate-900 mb-3 line-clamp-2 min-h-[3rem]">
+                  {course.name}
+                </h2>
+
+                {/* Meta info */}
+                <div className="space-y-2 text-xs md:text-sm text-slate-600 mb-4">
+                  <div className="flex items-center gap-2">
+                    <User size={14} className="text-slate-400 flex-shrink-0" />
+                    <span className="truncate">
+                      {course.teacher?.user?.name || "Not assigned"}
+                    </span>
+                  </div>
+                  {/* Course Code (IT-701) from DB */}
+                  <div className="flex items-center gap-2">
+                    <Hash size={14} className="text-slate-400 flex-shrink-0" />
+                    <span className="font-mono bg-slate-50 px-2 py-0.5 rounded border border-slate-200 text-slate-800">
+                      {course.code}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-slate-400 flex-shrink-0" />
+                    <span className="truncate">
+                      {course.semester?.academicYear?.name || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users size={14} className="text-slate-400 flex-shrink-0" />
+                    <span>{course._count?.students || 0} students enrolled</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="mt-auto pt-4 border-t border-slate-200 flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 justify-center"
+                    onClick={() => handleViewDetails(course)}
+                  >
+                    View details
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="sm:flex-shrink-0 border border-slate-200 hover:border-sky-500/60 hover:text-sky-700"
+                    onClick={() => handleViewAttendance(course)}
+                  >
+                    Attendance
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

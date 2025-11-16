@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   UserPlus,
-  Building,
-  Trash2
+  Building2,
+  Trash2,
+  Mail,
+  Users,
+  CheckCircle2,
 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Teacher {
   id: string;
@@ -25,8 +30,11 @@ export default function TeachersPage() {
   const [pendingTeachers, setPendingTeachers] = useState<Teacher[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // which teacher is currently being approved + its selected department
+  const [activeTeacherId, setActiveTeacherId] = useState<string | null>(null);
+  const [activeDepartmentId, setActiveDepartmentId] = useState<string>("");
 
   // Fetch teachers
   async function fetchTeachers() {
@@ -39,10 +47,12 @@ export default function TeachersPage() {
       });
       const data = await res.json();
 
-      const allTeachers: Teacher[] = Array.isArray(data.teachers) ? data.teachers : [];
+      const allTeachers: Teacher[] = Array.isArray(data.teachers)
+        ? data.teachers
+        : [];
 
-      setTeachers(allTeachers.filter((t: Teacher) => t.departmentId));
-      setPendingTeachers(allTeachers.filter((t: Teacher) => !t.departmentId));
+      setTeachers(allTeachers.filter((t) => t.departmentId));
+      setPendingTeachers(allTeachers.filter((t) => !t.departmentId));
     } catch (error) {
       console.error("Failed to fetch teachers:", error);
     }
@@ -52,6 +62,8 @@ export default function TeachersPage() {
   async function fetchDepartments() {
     try {
       const token = localStorage.getItem("token");
+      if (!token) return;
+
       const res = await fetch("/api/admin/departments", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -64,7 +76,7 @@ export default function TeachersPage() {
 
   // Approve Teacher
   async function approveTeacher(teacherId: string) {
-    if (!selectedDepartment) return;
+    if (!activeDepartmentId) return;
     setLoading(true);
 
     try {
@@ -72,12 +84,16 @@ export default function TeachersPage() {
       await fetch("/api/admin/approve-teacher", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, teacherId, departmentId: selectedDepartment }),
+        body: JSON.stringify({
+          token, // keeping your original body format
+          teacherId,
+          departmentId: activeDepartmentId,
+        }),
       });
 
-      setSelectedTeacher(null);
-      setSelectedDepartment("");
-      fetchTeachers();
+      setActiveTeacherId(null);
+      setActiveDepartmentId("");
+      await fetchTeachers();
     } catch (error) {
       console.error("Failed to approve teacher:", error);
     } finally {
@@ -92,12 +108,14 @@ export default function TeachersPage() {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) return;
+
       await fetch(`/api/admin/teachers/${teacherId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      fetchTeachers();
+      await fetchTeachers();
     } catch (error) {
       console.error("Failed to delete teacher:", error);
     } finally {
@@ -106,121 +124,258 @@ export default function TeachersPage() {
   }
 
   useEffect(() => {
-    fetchTeachers();
-    fetchDepartments();
+    async function init() {
+      setInitialLoading(true);
+      await Promise.all([fetchTeachers(), fetchDepartments()]);
+      setInitialLoading(false);
+    }
+    init();
   }, []);
 
+  const totalTeachers = teachers.length + pendingTeachers.length;
+
   return (
-    <div className="space-y-8 text-white">
-
+    <div className="space-y-8 text-slate-900">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Teachers Management</h1>
-        <p className="text-gray-400 mt-1 sm:text-base text-sm">
-          Approve, assign, and manage teachers efficiently.
-        </p>
-      </div>
-
-      {/* Pending Teachers */}
-      <div className="bg-[#141414]/80 border border-white/10 rounded-2xl backdrop-blur-md p-5 shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-yellow-400" /> Pending Approvals
-          </h2>
-          <span className="text-sm text-gray-300 bg-yellow-500/20 border border-yellow-500/40 px-3 py-1 rounded-full">
-            {pendingTeachers.length}
-          </span>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight flex items-center gap-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white text-lg shadow-[0_4px_10px_rgba(0,0,0,0.35)]">
+              T
+            </span>
+            <span>Teachers Management</span>
+          </h1>
+          <p className="text-sm sm:text-base text-slate-600 mt-1">
+            Approve new teachers, assign departments, and manage faculty
+            records.
+          </p>
         </div>
 
-        {pendingTeachers.length === 0 ? (
-          <p className="text-gray-400 text-sm">No pending teacher registrations.</p>
-        ) : (
-          <div className="space-y-4">
-            {pendingTeachers.map((t) => (
-              <div key={t.id} className="bg-[#0a0a0a] border border-white/10 p-4 rounded-xl transition-all">
-                <p className="font-medium text-white">{t.name}</p>
-                <p className="text-gray-400 text-sm">{t.email}</p>
-
-                {/* BUTTON ROW (white buttons like quick actions) */}
-                <div className="flex flex-wrap gap-3 mt-3">
-                  <button
-                    onClick={() => setSelectedTeacher(selectedTeacher === t.id ? null : t.id)}
-                    className="bg-white border border-gray-200 hover:bg-gray-100 text-black text-sm px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    Approve
-                  </button>
-
-                  <button
-                    onClick={() => deleteTeacher(t.id)}
-                    className="bg-white border border-gray-200 hover:bg-gray-100 text-black text-sm px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    Reject
-                  </button>
-                </div>
-
-                {/* SELECT DEPARTMENT & CONFIRM */}
-                {selectedTeacher === t.id && (
-                  <div className="mt-3 flex gap-3">
-                    <select
-                      className="flex-1 bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={() => approveTeacher(t.id)}
-                      className="bg-white border border-gray-200 hover:bg-gray-100 text-black text-sm px-3 py-2 rounded-lg transition-all"
-                      disabled={loading || !selectedDepartment}
-                    >
-                      Confirm
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+        {/* Small stats strip */}
+        <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
+          <div className="rounded-xl bg-white border border-slate-200 px-3 py-2 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
+            <p className="text-[11px] uppercase tracking-wide text-slate-400">
+              Total
+            </p>
+            <p className="text-lg font-semibold mt-1 flex items-center gap-1">
+              <Users className="w-4 h-4 text-slate-700" />
+              {totalTeachers}
+            </p>
+            <p className="text-[11px] text-slate-500">Teachers</p>
           </div>
-        )}
+          <div className="rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 border border-amber-200 px-3 py-2 shadow-[0_4px_14px_rgba(251,191,36,0.25)]">
+            <p className="text-[11px] uppercase tracking-wide text-amber-700/90">
+              Pending
+            </p>
+            <p className="text-lg font-semibold mt-1 text-amber-900">
+              {pendingTeachers.length}
+            </p>
+            <p className="text-[11px] text-amber-800/80">Approvals</p>
+          </div>
+          <div className="rounded-xl bg-gradient-to-br from-sky-100 to-sky-50 border border-sky-200 px-3 py-2 shadow-[0_4px_14px_rgba(56,189,248,0.25)]">
+            <p className="text-[11px] uppercase tracking-wide text-sky-700/90">
+              Approved
+            </p>
+            <p className="text-lg font-semibold mt-1 text-sky-900">
+              {teachers.length}
+            </p>
+            <p className="text-[11px] text-sky-800/80">Assigned</p>
+          </div>
+        </div>
       </div>
 
-      {/* Approved Teachers */}
-      <div className="bg-[#141414]/80 border border-white/10 rounded-2xl backdrop-blur-md p-5 shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Building className="w-5 h-5 text-blue-400" /> Approved Teachers
-          </h2>
-          <span className="text-sm text-gray-300 bg-blue-500/20 border border-blue-500/40 px-3 py-1 rounded-full">
-            {teachers.length}
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          {teachers.map((t) => (
-            <div key={t.id} className="flex justify-between items-center p-4 bg-[#0a0a0a] border border-white/10 rounded-xl">
-              <div>
-                <p className="font-medium text-white">{t.name}</p>
-                <p className="text-gray-400 text-sm">{t.email}</p>
-                <p className="text-gray-600 text-sm">Dept: {t.departmentName}</p>
-              </div>
-
-              <button
-                onClick={() => deleteTeacher(t.id)}
-                className="bg-white border border-gray-200 hover:bg-gray-100 text-black text-sm px-3 py-1.5 rounded-lg transition-all"
-              >
-                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
-                      <span className="sm:inline">Delete</span>
-              </button>
+      {/* Two-column layout: Pending + Approved */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Pending Approvals */}
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white shadow-[0_4px_12px_rgba(251,191,36,0.6)]">
+                  <UserPlus size={18} />
+                </span>
+                <span>Pending Approvals</span>
+              </CardTitle>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Review new registrations and assign them to departments.
+              </p>
             </div>
-          ))}
-        </div>
-      </div>
+            <span className="text-xs sm:text-sm px-3 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-medium">
+              {pendingTeachers.length} pending
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {initialLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 h-20"
+                  />
+                ))}
+              </div>
+            ) : pendingTeachers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 py-8 flex items-center justify-center">
+                <p className="text-sm text-slate-500">
+                  No pending teacher registrations right now.
+                </p>
+              </div>
+            ) : (
+              pendingTeachers.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 space-y-3 hover:bg-slate-50 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900">{t.name}</p>
+                      <p className="text-xs sm:text-sm text-slate-600 flex items-center gap-1 mt-0.5">
+                        <Mail className="w-3 h-3 text-slate-400" />
+                        {t.email}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1 font-medium">
+                        Pending approval
+                      </p>
+                    </div>
 
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-slate-900 hover:bg-slate-800 text-xs sm:text-sm"
+                        onClick={() => {
+                          setActiveTeacherId(
+                            activeTeacherId === t.id ? null : t.id
+                          );
+                          setActiveDepartmentId("");
+                        }}
+                      >
+                        Assign & Approve
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-200 text-red-600 hover:bg-red-50 text-xs sm:text-sm"
+                        onClick={() => deleteTeacher(t.id)}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+
+                  {activeTeacherId === t.id && (
+                    <div className="border-t border-slate-200 pt-3 mt-1 flex flex-col sm:flex-row gap-3 sm:items-end">
+                      <div className="flex-1">
+                        <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide mb-1 block">
+                          Assign Department
+                        </label>
+                        <select
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/70"
+                          value={activeDepartmentId}
+                          onChange={(e) =>
+                            setActiveDepartmentId(e.target.value)
+                          }
+                        >
+                          <option value="">Select department</option>
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm"
+                        disabled={loading || !activeDepartmentId}
+                        onClick={() => approveTeacher(t.id)}
+                      >
+                        {loading && activeTeacherId === t.id ? (
+                          <span className="mr-2 h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                        )}
+                        Confirm
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Approved Teachers */}
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.6)]">
+                  <Building2 size={18} />
+                </span>
+                <span>Approved Teachers</span>
+              </CardTitle>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Teachers already assigned to departments.
+              </p>
+            </div>
+            <span className="text-xs sm:text-sm px-3 py-1 rounded-full border border-sky-200 bg-sky-50 text-sky-800 font-medium">
+              {teachers.length} active
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {initialLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 h-20"
+                  />
+                ))}
+              </div>
+            ) : teachers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 py-8 flex items-center justify-center">
+                <p className="text-sm text-slate-500">
+                  No approved teachers yet. Approve pending requests to populate
+                  this list.
+                </p>
+              </div>
+            ) : (
+              teachers.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition-all"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-900">{t.name}</p>
+                    <p className="text-xs sm:text-sm text-slate-600 flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3 text-slate-400" />
+                      {t.email}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Department:{" "}
+                      <span className="font-medium text-slate-800">
+                        {t.departmentName || "Not assigned"}
+                      </span>
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-600 hover:bg-red-50 text-xs sm:text-sm self-start sm:self-auto"
+                    onClick={() => deleteTeacher(t.id)}
+                  >
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

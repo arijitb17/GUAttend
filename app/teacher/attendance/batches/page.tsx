@@ -2,6 +2,16 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Camera,
+  Users,
+  Brain,
+  History,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Student {
   id: string;
@@ -64,7 +74,7 @@ export default function AttendanceCapturePage() {
   useEffect(() => {
     const urlCourseId = searchParams.get("courseId");
     const urlCourseName = searchParams.get("courseName");
-    
+
     const storedCourseId = localStorage.getItem("selectedCourseId");
     const storedCourseName = localStorage.getItem("selectedCourseName");
 
@@ -79,7 +89,7 @@ export default function AttendanceCapturePage() {
 
     setCourseId(finalCourseId);
     setCourseName(finalCourseName || "");
-    
+
     localStorage.setItem("selectedCourseId", finalCourseId);
     if (finalCourseName) {
       localStorage.setItem("selectedCourseName", finalCourseName);
@@ -91,6 +101,7 @@ export default function AttendanceCapturePage() {
     return () => {
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchStudents(courseId: string) {
@@ -136,10 +147,10 @@ export default function AttendanceCapturePage() {
   async function startCamera() {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1280 }, 
-          height: { ideal: 720 }, 
-          facingMode: "user" 
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user",
         },
         audio: false,
       });
@@ -196,10 +207,14 @@ export default function AttendanceCapturePage() {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error("Failed to create blob"));
-          }, "image/jpeg", 0.95);
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error("Failed to create blob"));
+            },
+            "image/jpeg",
+            0.95
+          );
         });
 
         frames.push(blob);
@@ -216,197 +231,198 @@ export default function AttendanceCapturePage() {
     }
   }
 
-async function recognizeFaces(frames: Blob[]) {
-  if (!courseId) return;
+  async function recognizeFaces(frames: Blob[]) {
+    if (!courseId) return;
 
-  try {
-    setRecognizing(true);
+    try {
+      setRecognizing(true);
 
-    const formData = new FormData();
-    formData.append("courseId", courseId);
-    formData.append("batchId", `batch_${Date.now()}`);
+      const formData = new FormData();
+      formData.append("courseId", courseId);
+      formData.append("batchId", `batch_${Date.now()}`);
 
-    frames.forEach((frame, index) => {
-      formData.append("frames", frame, `frame_${index}.jpg`);
-    });
+      frames.forEach((frame, index) => {
+        formData.append("frames", frame, `frame_${index}.jpg`);
+      });
 
-    const token = localStorage.getItem("token");
-    const res = await fetch("/api/teacher/attendance?operation=recognize", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/teacher/attendance?operation=recognize", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-    if (!res.ok) {
-      const error = await res.json();
-      alert(`Recognition failed: ${error.error || "Unknown error"}`);
-      return;
-    }
-
-    const result = await res.json();
-    console.log("RAW /api/recognize response:", result);
-    console.log("Loaded students (before normalize):", students);
-
-    // if no students loaded yet, fetch them
-    if ((!students || students.length === 0) && typeof fetchStudents === "function") {
-      try {
-        await fetchStudents(courseId);
-        console.log("Fetched students for normalization:", students);
-      } catch (e) {
-        console.warn("fetchStudents failed during normalization:", e);
-      }
-    }
-
-    // helper to match recognized IDs to known students
-    function findStudentByCandidate(candidate: string | null | undefined) {
-      if (!candidate) return null;
-      const s = String(candidate).trim();
-      let found =
-        students.find(st => st.id === s) ||
-        students.find(st => st.id.toLowerCase() === s.toLowerCase()) ||
-        students.find(st => (st.name || "").toLowerCase() === s.toLowerCase()) ||
-        students.find(st => (st.email || "").toLowerCase() === s.toLowerCase()) ||
-        students.find(
-          st =>
-            (st.id || "").toLowerCase().includes(s.toLowerCase()) ||
-            (st.name || "").toLowerCase().includes(s.toLowerCase()) ||
-            (st.email || "").toLowerCase().includes(s.toLowerCase())
-        );
-      return found || null;
-    }
-
-    // normalize recognized students
-    const rawRec = result.recognizedStudents || [];
-    const normalized: RecognitionStudent[] = rawRec.map((item: any, idx: number) => {
-      console.log(`recognizedStudents[${idx}] raw:`, item);
-
-      if (!item) return { id: "unknown", name: "unknown", email: "" };
-
-      // case 1: backend returned a string ID
-      if (typeof item === "string") {
-        const idStr = item.trim();
-        const found = findStudentByCandidate(idStr);
-        if (found) return { id: found.id, name: found.name, email: found.email };
-        console.warn("Unmatched recognized ID:", idStr);
-        return { id: idStr, name: idStr, email: "" };
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Recognition failed: ${error.error || "Unknown error"}`);
+        return;
       }
 
-      // case 2: backend returned object
-      if (typeof item === "object") {
-        const possibleFields = [
-          item.id,
-          item.studentId,
-          item.student_id,
-          item.name,
-          item.studentName,
-          item.displayName,
-          item.email,
-          item.studentEmail,
-        ].filter(Boolean);
+      const result = await res.json();
+      console.log("RAW /api/recognize response:", result);
+      console.log("Loaded students (before normalize):", students);
 
-        for (const cand of possibleFields) {
-          const found = findStudentByCandidate(cand);
+      // if no students loaded yet, fetch them
+      if ((!students || students.length === 0) && typeof fetchStudents === "function") {
+        try {
+          await fetchStudents(courseId);
+          console.log("Fetched students for normalization:", students);
+        } catch (e) {
+          console.warn("fetchStudents failed during normalization:", e);
+        }
+      }
+
+      // helper to match recognized IDs to known students
+      function findStudentByCandidate(candidate: string | null | undefined) {
+        if (!candidate) return null;
+        const s = String(candidate).trim();
+        const found =
+          students.find((st) => st.id === s) ||
+          students.find((st) => st.id.toLowerCase() === s.toLowerCase()) ||
+          students.find((st) => (st.name || "").toLowerCase() === s.toLowerCase()) ||
+          students.find((st) => (st.email || "").toLowerCase() === s.toLowerCase()) ||
+          students.find(
+            (st) =>
+              (st.id || "").toLowerCase().includes(s.toLowerCase()) ||
+              (st.name || "").toLowerCase().includes(s.toLowerCase()) ||
+              (st.email || "").toLowerCase().includes(s.toLowerCase())
+          );
+        return found || null;
+      }
+
+      // normalize recognized students
+      const rawRec = result.recognizedStudents || [];
+      const normalized: RecognitionStudent[] = rawRec.map((item: any, idx: number) => {
+        console.log(`recognizedStudents[${idx}] raw:`, item);
+
+        if (!item) return { id: "unknown", name: "unknown", email: "" };
+
+        // case 1: backend returned a string ID
+        if (typeof item === "string") {
+          const idStr = item.trim();
+          const found = findStudentByCandidate(idStr);
           if (found) return { id: found.id, name: found.name, email: found.email };
+          console.warn("Unmatched recognized ID:", idStr);
+          return { id: idStr, name: idStr, email: "" };
         }
 
-        const fallbackId = item.id ?? item.studentId ?? "unknown";
-        const fallbackName = item.name ?? item.studentName ?? String(fallbackId);
-        const fallbackEmail = item.email ?? item.studentEmail ?? "";
-        return { id: String(fallbackId), name: String(fallbackName), email: String(fallbackEmail) };
-      }
+        // case 2: backend returned object
+        if (typeof item === "object") {
+          const possibleFields = [
+            item.id,
+            item.studentId,
+            item.student_id,
+            item.name,
+            item.studentName,
+            item.displayName,
+            item.email,
+            item.studentEmail,
+          ].filter(Boolean);
 
-      // fallback for unexpected type
-      return { id: String(item), name: String(item), email: "" };
-    });
+          for (const cand of possibleFields) {
+            const found = findStudentByCandidate(cand);
+            if (found) return { id: found.id, name: found.name, email: found.email };
+          }
 
-    // normalize detections
-    const rawDetections: any[] = result.detections || [];
-    const normalizedDetections: RecognitionDetection[] = rawDetections.map((d: any) => ({
-      imageIndex: d.imageIndex ?? d.frameIndex ?? 0,
-      faceIndex: d.faceIndex ?? 0,
-      bbox: d.bbox ?? undefined,
-      confidence:
-        typeof d.confidence === "number"
-          ? d.confidence
-          : parseFloat(d.confidence) || 0,
-      studentId: d.studentId ?? d.id ?? null,
-    }));
+          const fallbackId = item.id ?? item.studentId ?? "unknown";
+          const fallbackName = item.name ?? item.studentName ?? String(fallbackId);
+          const fallbackEmail = item.email ?? item.studentEmail ?? "";
+          return {
+            id: String(fallbackId),
+            name: String(fallbackName),
+            email: String(fallbackEmail),
+          };
+        }
 
-    // preliminary result
-    const normalizedResult: RecognitionResult = {
-      totalFaces: Number(result.totalFaces ?? normalizedDetections.length ?? 0),
-      recognizedStudents: normalized,
-      averageConfidence:
-        typeof result.averageConfidence === "number"
-          ? result.averageConfidence
-          : parseFloat(result.averageConfidence) || 0,
-      detections: normalizedDetections,
-    };
+        // fallback for unexpected type
+        return { id: String(item), name: String(item), email: "" };
+      });
 
-    // ✅ resolve missing names (call backend only if needed)
-    const missingIds = normalized
-      .filter(s => s && (!s.name || s.name === s.id))
-      .map(s => s.id)
-      .filter(id => id && id !== "unknown");
+      // normalize detections
+      const rawDetections: any[] = result.detections || [];
+      const normalizedDetections: RecognitionDetection[] = rawDetections.map((d: any) => ({
+        imageIndex: d.imageIndex ?? d.frameIndex ?? 0,
+        faceIndex: d.faceIndex ?? 0,
+        bbox: d.bbox ?? undefined,
+        confidence:
+          typeof d.confidence === "number"
+            ? d.confidence
+            : parseFloat(d.confidence) || 0,
+        studentId: d.studentId ?? d.id ?? null,
+      }));
 
-    if (missingIds.length > 0) {
-      console.log("Resolving missing IDs from backend:", missingIds);
-      try {
-        const token = localStorage.getItem("token");
-        const resp = await fetch("/api/teacher/attendance?operation=resolve-ids", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ids: missingIds }),
-        });
-
-        if (resp.ok) {
-  // Explicitly tell TypeScript the JSON structure
-  const resolved = (await resp.json()) as Array<{ id: string; name?: string; email?: string }>;
-
-  // Create a map from ID → student object
-  const map = new Map(resolved.map((r) => [r.id, r]));
-
-  // Merge resolved data into normalized array
-  const merged = normalized.map((s) => {
-    const r = map.get(s.id);
-    if (r) {
-      return {
-        id: r.id,
-        name: r.name || s.id,
-        email: r.email || "",
+      // preliminary result
+      const normalizedResult: RecognitionResult = {
+        totalFaces: Number(result.totalFaces ?? normalizedDetections.length ?? 0),
+        recognizedStudents: normalized,
+        averageConfidence:
+          typeof result.averageConfidence === "number"
+            ? result.averageConfidence
+            : parseFloat(result.averageConfidence) || 0,
+        detections: normalizedDetections,
       };
-    }
-    return s;
-  });
 
-          const mergedResult = { ...normalizedResult, recognizedStudents: merged };
-          console.log("✅ Merged recognitionResult (with resolved IDs):", mergedResult);
-          setRecognitionResult(mergedResult);
-          return;
-        } else {
-          console.warn("resolve-ids request failed; using fallback normalized data");
+      // ✅ resolve missing names (call backend only if needed)
+      const missingIds = normalized
+        .filter((s) => s && (!s.name || s.name === s.id))
+        .map((s) => s.id)
+        .filter((id) => id && id !== "unknown");
+
+      if (missingIds.length > 0) {
+        console.log("Resolving missing IDs from backend:", missingIds);
+        try {
+          const token2 = localStorage.getItem("token");
+          const resp = await fetch("/api/teacher/attendance?operation=resolve-ids", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token2}`,
+            },
+            body: JSON.stringify({ ids: missingIds }),
+          });
+
+          if (resp.ok) {
+            const resolved = (await resp.json()) as Array<{
+              id: string;
+              name?: string;
+              email?: string;
+            }>;
+
+            const map = new Map(resolved.map((r) => [r.id, r]));
+            const merged = normalized.map((s) => {
+              const r = map.get(s.id);
+              if (r) {
+                return {
+                  id: r.id,
+                  name: r.name || s.id,
+                  email: r.email || "",
+                };
+              }
+              return s;
+            });
+
+            const mergedResult = { ...normalizedResult, recognizedStudents: merged };
+            console.log("✅ Merged recognitionResult (with resolved IDs):", mergedResult);
+            setRecognitionResult(mergedResult);
+            return;
+          } else {
+            console.warn("resolve-ids request failed; using fallback normalized data");
+          }
+        } catch (e) {
+          console.warn("resolve-ids call error:", e);
         }
-      } catch (e) {
-        console.warn("resolve-ids call error:", e);
       }
+
+      // fallback: just use normalized result
+      console.log("✅ Normalized recognitionResult (set to state):", normalizedResult);
+      setRecognitionResult(normalizedResult);
+    } catch (error) {
+      console.error("Recognition error:", error);
+      alert("Failed to recognize faces. Please ensure training is complete.");
+    } finally {
+      setRecognizing(false);
     }
-
-    // fallback: just use normalized result
-    console.log("✅ Normalized recognitionResult (set to state):", normalizedResult);
-    setRecognitionResult(normalizedResult);
-
-  } catch (error) {
-    console.error("Recognition error:", error);
-    alert("Failed to recognize faces. Please ensure training is complete.");
-  } finally {
-    setRecognizing(false);
   }
-}
-
-
 
   async function submitAttendance() {
     if (!recognitionResult || !courseId) return;
@@ -432,13 +448,13 @@ async function recognizeFaces(frames: Blob[]) {
         const result = await res.json();
         alert(
           `✔ Attendance submitted successfully!\n\n` +
-          `Present: ${result.statistics.present}\n` +
-          `Absent: ${result.statistics.absent}\n` +
-          `Attendance Rate: ${result.statistics.attendanceRate}%`
+            `Present: ${result.statistics.present}\n` +
+            `Absent: ${result.statistics.absent}\n` +
+            `Attendance Rate: ${result.statistics.attendanceRate}%`
         );
-        
+
         await fetchAttendanceHistory(courseId);
-        
+
         setCapturedFrames([]);
         setRecognitionResult(null);
         stopCamera();
@@ -465,120 +481,166 @@ async function recognizeFaces(frames: Blob[]) {
 
   if (!courseId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+      <div className="flex justify-center items-center min-h-[240px] text-slate-900">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="text-gray-400 mt-4">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
+          <p className="text-slate-500 mt-3 text-sm">Loading...</p>
         </div>
       </div>
     );
   }
 
+  const historyEntries = Object.entries(attendanceHistory).sort(([a], [b]) =>
+    b.localeCompare(a)
+  );
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] py-4 sm:py-8 px-4">
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
-        {/* Header */}
-        <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <button
-                onClick={goBack}
-                className="text-blue-400 hover:text-blue-300 mb-2 flex items-center text-sm font-medium transition-colors"
-              >
-                ← Back to Course Selection
-              </button>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                Face Recognition Attendance
-              </h1>
-              <p className="text-gray-400 text-sm sm:text-base">
-                {courseName || "Course Attendance"}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="w-full sm:w-auto px-4 py-2 bg-[#0a0a0a] border border-white/10 text-gray-300 rounded-lg hover:border-blue-500/40 hover:shadow-[0_0_15px_rgba(59,130,246,0.15)] transition-all font-medium text-sm sm:text-base"
-            >
-              {showHistory ? "Hide History" : "View History"}
-            </button>
-          </div>
+    <div className="space-y-8 text-slate-900">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <Button
+            variant="ghost"
+            onClick={goBack}
+            className="px-0 h-auto mb-2 text-slate-600 hover:text-slate-900 hover:bg-transparent text-sm flex items-center gap-1"
+          >
+            ← <span>Back to Attendance Setup</span>
+          </Button>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+              <Camera size={18} />
+            </span>
+            <span>Face Recognition Attendance</span>
+          </h1>
+          <p className="text-sm md:text-base text-slate-600 mt-1">
+            {courseName || "Course attendance capture using AI-based face recognition."}
+          </p>
         </div>
 
-        {/* Student Stats */}
-        {!showHistory && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-              <p className="text-gray-400 text-xs sm:text-sm mb-1">Total Students</p>
-              <p className="text-2xl sm:text-3xl font-bold text-white">{students.length}</p>
-            </div>
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md">
-              <p className="text-green-400 text-xs sm:text-sm mb-1">Trained Students</p>
-              <p className="text-2xl sm:text-3xl font-bold text-green-300">{trainedStudents}</p>
-            </div>
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md">
-              <p className="text-yellow-400 text-xs sm:text-sm mb-1">Untrained Students</p>
-              <p className="text-2xl sm:text-3xl font-bold text-yellow-300">{untrainedStudents}</p>
-            </div>
-          </div>
-        )}
+        <Button
+          variant="outline"
+          onClick={() => setShowHistory(!showHistory)}
+          className="inline-flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 text-sm"
+        >
+          <History size={16} />
+          <span>{showHistory ? "Hide History" : "View History"}</span>
+        </Button>
+      </div>
 
-        {/* Attendance History */}
-        {showHistory && (
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-            <h2 className="text-lg sm:text-xl font-semibold text-white mb-4">
-              Attendance History - {courseName}
-            </h2>
-            
-            {Object.keys(attendanceHistory).length === 0 ? (
+      {/* Top stats (when NOT viewing history) */}
+      {!showHistory && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="border border-slate-200 bg-white rounded-2xl shadow-sm">
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                Total Students
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">
+                {students.length}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border border-emerald-200 bg-emerald-50 rounded-2xl shadow-sm">
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase flex items-center gap-1">
+                <CheckCircle2 size={14} /> Trained Students
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 text-emerald-800">
+                {trainedStudents}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border border-amber-200 bg-amber-50 rounded-2xl shadow-sm">
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-xs font-semibold tracking-wide text-amber-700 uppercase flex items-center gap-1">
+                <AlertCircle size={14} /> Untrained Students
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 text-amber-800">
+                {untrainedStudents}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Attendance History (toggle view) */}
+      {showHistory && (
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+              <History size={20} className="text-indigo-500" />
+              <span>Attendance History</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {historyEntries.length === 0 ? (
               <div className="text-center py-12">
-                <span className="text-4xl sm:text-6xl mb-4 block">📋</span>
-                <p className="text-gray-400 text-sm sm:text-base">No attendance records yet</p>
+                <p className="text-4xl mb-3">📋</p>
+                <p className="text-slate-500 text-sm md:text-base">
+                  No attendance records yet for this course.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {Object.entries(attendanceHistory)
-                  .sort(([a], [b]) => b.localeCompare(a))
-                  .map(([date, records]) => {
-                    const presentCount = records.filter(r => r.status).length;
-                    const totalCount = records.length;
-                    const attendanceRate = ((presentCount / totalCount) * 100).toFixed(1);
-                    
-                    return (
-                      <div key={date} className="bg-[#0a0a0a] border border-white/10 rounded-lg overflow-hidden">
-                        <div className="bg-[#1a1a1a]/60 px-3 sm:px-4 py-3 border-b border-white/10">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <h3 className="font-semibold text-white text-sm sm:text-base">
-                              {new Date(date).toLocaleDateString('en-US', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
+                {historyEntries.map(([date, records]) => {
+                  const presentCount = records.filter((r) => r.status).length;
+                  const totalCount = records.length;
+                  const attendanceRate = ((presentCount / totalCount) * 100).toFixed(1);
+
+                  return (
+                    <Card
+                      key={date}
+                      className="border border-slate-200 bg-slate-50 rounded-2xl overflow-hidden"
+                    >
+                      <CardHeader className="px-4 py-3 border-b border-slate-200">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-900 text-sm md:text-base">
+                              {new Date(date).toLocaleDateString("en-US", {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
                               })}
-                            </h3>
-                            <div className="flex items-center space-x-3 sm:space-x-4">
-                              <span className="text-xs sm:text-sm text-gray-400">
-                                Present: <strong className="text-green-400">{presentCount}</strong> / {totalCount}
-                              </span>
-                              <span className="px-2 sm:px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-xs sm:text-sm font-medium">
-                                {attendanceRate}%
-                              </span>
-                            </div>
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {courseName || "Course attendance"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs md:text-sm text-slate-600">
+                              Present:{" "}
+                              <span className="font-semibold text-emerald-600">
+                                {presentCount}
+                              </span>{" "}
+                              / {totalCount}
+                            </span>
+                            <span className="px-3 py-1 rounded-full text-xs md:text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                              {attendanceRate}% attendance
+                            </span>
                           </div>
                         </div>
-                        <div className="divide-y divide-white/10">
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="divide-y divide-slate-200">
                           {records.map((record) => (
                             <div
-                              key={record.studentId}
-                              className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-white/5 transition-colors gap-2"
+                              key={`${record.studentId}-${record.timestamp}`}
+                              className="px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 hover:bg-white"
                             >
                               <div>
-                                <p className="font-medium text-white text-sm sm:text-base">{record.studentName}</p>
-                                <p className="text-xs sm:text-sm text-gray-400 break-all">{record.studentEmail}</p>
+                                <p className="font-medium text-sm md:text-base text-slate-900">
+                                  {record.studentName}
+                                </p>
+                                <p className="text-xs md:text-sm text-slate-500 break-all">
+                                  {record.studentEmail}
+                                </p>
                               </div>
                               <span
-                                className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap ${
+                                className={`px-3 py-1 rounded-full text-xs md:text-sm font-medium ${
                                   record.status
-                                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                                    : "bg-red-500/20 text-red-400 border border-red-500/30"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
                                 }`}
                               >
                                 {record.status ? "✔ Present" : "✗ Absent"}
@@ -586,24 +648,42 @@ async function recognizeFaces(frames: Blob[]) {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    );
-                  })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
-          </div>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Camera Section */}
-        {!showHistory && (
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-            <h2 className="text-lg sm:text-xl font-semibold text-white mb-4">
-              Camera Capture
-            </h2>
-
-            <div className="space-y-3 sm:space-y-4">
+      {/* Camera + Recognition side-by-side (when not viewing history) */}
+      {!showHistory && (
+        <div className="grid gap-6 lg:grid-cols-[3fr,2fr] items-start">
+          {/* Camera Card */}
+          <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(79,70,229,0.6)]">
+                  <Camera size={18} />
+                </div>
+                <div>
+                  <CardTitle className="text-base md:text-lg">
+                    Camera Capture
+                  </CardTitle>
+                  <p className="text-xs md:text-sm text-slate-500">
+                    Capture frames and run face recognition.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {/* Video Preview */}
-              <div className="relative bg-black rounded-lg overflow-hidden border border-white/10" style={{ aspectRatio: "16/9" }}>
+              <div
+                className="relative bg-black rounded-xl overflow-hidden border border-slate-200"
+                style={{ aspectRatio: "16/9" }}
+              >
                 <video
                   ref={videoRef}
                   autoPlay
@@ -612,166 +692,230 @@ async function recognizeFaces(frames: Blob[]) {
                   className="w-full h-full object-cover"
                 />
                 <canvas ref={canvasRef} className="hidden" />
-                
+
                 {!cameraActive && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]">
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
                     <div className="text-center px-4">
-                      <span className="text-4xl sm:text-6xl mb-4 block">📸</span>
-                      <p className="text-gray-300 text-base sm:text-lg mb-4">Camera is off</p>
-                      <button
+                      <p className="text-4xl mb-2">📷</p>
+                      <p className="text-slate-100 text-sm md:text-base mb-3">
+                        Camera is currently off
+                      </p>
+                      <Button
                         onClick={startCamera}
-                        className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all font-medium text-sm sm:text-base"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-slate-800 text-sm md:text-base px-5 py-2.5 shadow-[0_10px_25px_rgba(79,70,229,0.55)]"
                       >
                         Start Camera
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
 
                 {(capturing || recognizing) && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                     <div className="text-center px-4">
-                      <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-t-4 border-blue-500 mb-4 mx-auto"></div>
-                      <p className="text-white text-base sm:text-lg font-semibold">
-                        {capturing ? "Capturing frames..." : "Recognizing faces..."}
+                      <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-t-4 border-indigo-500 mb-3 mx-auto" />
+                      <p className="text-white text-sm md:text-base font-medium">
+                        {capturing
+                          ? "Capturing frames..."
+                          : "Running face recognition..."}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Camera Controls */}
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                {cameraActive && (
+              {/* Camera controls */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {cameraActive ? (
                   <>
-                    <button
-                      onClick={captureFrames}
-                      disabled={capturing || recognizing}
-                      className={`flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-base sm:text-lg transition-all ${
-                        capturing || recognizing
-                          ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                          : "bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
-                      }`}
-                    >
-                      {capturing ? "Capturing..." : recognizing ? "Recognizing..." : "📸 Start Capture"}
-                    </button>
-                    <button
-                      onClick={stopCamera}
-                      disabled={capturing || recognizing}
-                      className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-all ${
-                        capturing || recognizing
-                          ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                          : "bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
-                      } text-sm sm:text-base`}
-                    >
-                      Stop Camera
-                    </button>
+                      <Button
+    onClick={captureFrames}
+    disabled={capturing || recognizing}
+    className={`flex-1 h-auto py-3 sm:py-4 px-4 sm:px-5 justify-start text-left rounded-2xl border transition-all duration-300
+      ${
+        capturing || recognizing
+          ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+          : "bg-white border-slate-300 hover:bg-slate-50 text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
+      }`}
+  >
+    <div className="flex items-center gap-3 sm:gap-4">
+      <div
+        className={`flex h-10 w-10 items-center justify-center rounded-xl border
+          ${
+            capturing || recognizing
+              ? "bg-slate-200 border-slate-300 text-slate-500"
+              : "bg-slate-100 border-slate-300 text-slate-700"
+          }`}
+      >
+        <span className="text-lg">📸</span>
+      </div>
+
+      <div className="flex-1">
+        <p className="text-sm sm:text-base font-semibold leading-tight text-slate-800">
+          {capturing
+            ? "Capturing..."
+            : recognizing
+            ? "Recognizing..."
+            : "Start Capture"}
+        </p>
+
+        <p
+          className={`mt-0.5 text-xs sm:text-[13px] leading-snug
+            ${
+              capturing || recognizing
+                ? "text-slate-500"
+                : "text-slate-600"
+            }`}
+        >
+          Capture multiple frames for accurate face recognition.
+        </p>
+      </div>
+    </div>
+  </Button>
+
+  {/* Stop Camera */}
+  <Button
+    variant="outline"
+    onClick={stopCamera}
+    disabled={capturing || recognizing}
+    className={`h-auto py-3 sm:py-4 px-4 sm:px-5 rounded-2xl text-sm md:text-base border transition-all duration-300
+      ${
+        capturing || recognizing
+          ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
+          : "border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400"
+      }`}
+  >
+    Stop Camera
+  </Button>
                   </>
+                ) : (
+                  <div className="text-xs md:text-sm text-slate-500">
+                    Click <span className="font-semibold">“Start Camera”</span> to
+                    begin capturing frames.
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Recognition Results */}
-        {recognitionResult && !showHistory && (
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)]">
-            <h2 className="text-lg sm:text-xl font-semibold text-white mb-4">
-              Recognition Results
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
-                <p className="text-blue-400 text-xs sm:text-sm mb-1">Total Faces</p>
-                <p className="text-2xl sm:text-3xl font-bold text-blue-300">
-                  {recognitionResult.totalFaces}
-                </p>
-              </div>
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
-                <p className="text-green-400 text-xs sm:text-sm mb-1">Recognized</p>
-                <p className="text-2xl sm:text-3xl font-bold text-green-300">
-                  {recognitionResult.recognizedStudents.length}
-                </p>
-              </div>
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
-                <p className="text-purple-400 text-xs sm:text-sm mb-1">Avg Confidence</p>
-                <p className="text-2xl sm:text-3xl font-bold text-purple-300">
-                  {(recognitionResult.averageConfidence * 100).toFixed(1)}%
-                </p>
-              </div>
-            </div>
-
-            {/* Recognized Students List */}
-            <div className="mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg font-semibold text-white mb-3">
-                Present Students ({recognitionResult.recognizedStudents.length})
-              </h3>
-              {recognitionResult.recognizedStudents.length > 0 ? (
-                <div className="space-y-2">
-                  {recognitionResult.recognizedStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 bg-green-500/10 border border-green-500/30 rounded-lg backdrop-blur-sm gap-2"
-                    >
-                      <div>
-                        <p className="font-semibold text-white text-sm sm:text-base">
-                          {student.name}
-                        </p>
-                        <p className="text-xs sm:text-sm text-gray-400 break-all">{student.email}</p>
-                      </div>
-                      <span className="px-2 sm:px-3 py-1 bg-green-600 text-white rounded-full text-xs sm:text-sm font-medium shadow-[0_0_15px_rgba(34,197,94,0.3)] whitespace-nowrap">
-                        ✔ Present
-                      </span>
+              {/* Instructions */}
+              {!cameraActive && !recognitionResult && (
+                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs md:text-sm text-slate-700 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Brain size={14} className="text-indigo-500" />
+                    <span>How to use camera-based attendance</span>
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1.5">
+                    <li>Ensure students are trained (see trained count above).</li>
+                    <li>Click <strong>“Start Camera”</strong> and position students in view.</li>
+                    <li>Click <strong>“Start Capture”</strong> to capture 8 frames.</li>
+                    <li>Wait for recognition to finish and review the result.</li>
+                    <li>Submit attendance when you’re satisfied.</li>
+                  </ol>
+                  {untrainedStudents > 0 && (
+                    <div className="mt-2 px-3 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 text-[11px] md:text-xs">
+                      ⚠ {untrainedStudents} student(s) are not trained yet and will not be
+                      recognized during capture.
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <p className="text-gray-400 text-center py-8 text-sm sm:text-base">
-                  No students recognized
-                </p>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Submit Button */}
-            <button
-              onClick={submitAttendance}
-              disabled={submitting}
-              className={`w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all ${
-                submitting
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
-              }`}
-            >
-              {submitting ? "Submitting..." : "✔ Submit Attendance"}
-            </button>
-          </div>
-        )}
-
-        {/* Instructions */}
-        {!cameraActive && !recognitionResult && !showHistory && (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg sm:rounded-xl p-4 sm:p-6 backdrop-blur-sm">
-            <h3 className="text-base sm:text-lg font-semibold text-blue-300 mb-3">
-              📋 Instructions
-            </h3>
-            <ol className="space-y-2 text-blue-200 text-sm sm:text-base">
-              <li>1. Make sure students have been trained (see green count above)</li>
-              <li>2. Click "Start Camera" to activate the webcam</li>
-              <li>3. Ensure students are visible in the camera frame</li>
-              <li>4. Click "Start Capture" to capture 8 frames automatically</li>
-              <li>5. Wait for face recognition to complete</li>
-              <li>6. Review recognized students and submit attendance</li>
-            </ol>
-            {untrainedStudents > 0 && (
-              <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg backdrop-blur-sm">
-                <p className="text-xs sm:text-sm text-yellow-300">
-                  <strong>⚠️ Warning:</strong> {untrainedStudents} student(s) haven't been trained yet. 
-                  They won't be recognized during attendance capture.
+          {/* Recognition & Submit Card */}
+          <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Brain size={18} className="text-indigo-500" />
+                <span>Recognition Results</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!recognitionResult ? (
+                <p className="text-sm md:text-base text-slate-500">
+                  Capture frames to see recognized students and their attendance.
                 </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              ) : (
+                <>
+                  {/* Stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                        Total Faces
+                      </p>
+                      <p className="text-xl md:text-2xl font-bold text-slate-900 mt-1">
+                        {recognitionResult.totalFaces}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                      <p className="text-[11px] font-semibold tracking-wide text-emerald-700 uppercase">
+                        Recognized
+                      </p>
+                      <p className="text-xl md:text-2xl font-bold text-emerald-800 mt-1">
+                        {recognitionResult.recognizedStudents.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3">
+                      <p className="text-[11px] font-semibold tracking-wide text-purple-700 uppercase">
+                        Avg Confidence
+                      </p>
+                      <p className="text-xl md:text-2xl font-bold text-purple-800 mt-1">
+                        {(recognitionResult.averageConfidence * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Recognized students list */}
+                  <div>
+                    <h3 className="text-sm md:text-base font-semibold text-slate-900 mb-2">
+                      Present Students (
+                      {recognitionResult.recognizedStudents.length})
+                    </h3>
+                    {recognitionResult.recognizedStudents.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-4 text-center border border-dashed border-slate-200 rounded-xl">
+                        No students recognized in this capture.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                        {recognitionResult.recognizedStudents.map((student) => (
+                          <div
+                            key={student.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">
+                                {student.name}
+                              </p>
+                              <p className="text-xs text-slate-600 break-all">
+                                {student.email}
+                              </p>
+                            </div>
+                            <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-[0_0_12px_rgba(16,185,129,0.5)]">
+                              ✔ Present
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Submit button */}
+                  <Button
+                    onClick={submitAttendance}
+                    disabled={submitting}
+                    className={`w-full mt-2 text-sm md:text-base font-semibold ${
+                      submitting
+                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-green-400 shadow-[0_10px_25px_rgba(79,70,229,0.4)]"
+                    }`}
+                  >
+                    {submitting ? "Submitting..." : "✔ Submit Attendance"}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -84,6 +84,7 @@ model Semester {
 model Course {
   id             String      @id @default(cuid())
   name           String
+  code           String      @unique 
   entryCode      String      @unique
   teacher        Teacher     @relation(fields: [teacherId], references: [id])
   teacherId      String
@@ -92,6 +93,7 @@ model Course {
   students       Student[]   @relation("CourseStudents")
   attendance     Attendance[]
 }
+
 
 model Attendance {
   id         String    @id @default(cuid())

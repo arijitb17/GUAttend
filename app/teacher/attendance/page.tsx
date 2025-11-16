@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Users, CheckCircle2, AlertCircle, Camera, GraduationCap } from "lucide-react";
+import {
+  BookOpen,
+  Users,
+  CheckCircle2,
+  AlertCircle,
+  Camera,
+  GraduationCap,
+  PlayCircle,
+  Sparkles,
+} from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Course {
   id: string;
@@ -52,6 +63,73 @@ interface Student {
   hasPhotos?: boolean;
 }
 
+/* ---------- Shared stat card styles (like TeacherOverview) ---------- */
+
+const STAT_STYLES = [
+  {
+    bg: "from-indigo-400/30 via-indigo-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-indigo-500 to-sky-400 shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)]",
+  },
+  {
+    bg: "from-emerald-400/30 via-emerald-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-emerald-500 to-lime-400 shadow-[0_8px_20px_-4px_rgba(16,185,129,0.4)]",
+  },
+  {
+    bg: "from-amber-400/30 via-amber-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-amber-500 to-orange-400 shadow-[0_8px_20px_-4px_rgba(245,158,11,0.4)]",
+  },
+  {
+    bg: "from-purple-400/30 via-purple-400/10 to-transparent",
+    iconBg:
+      "bg-gradient-to-br from-purple-500 to-pink-400 shadow-[0_8px_20px_-4px_rgba(168,85,247,0.4)]",
+  },
+];
+
+/* ---------- Helpers for IT-701 style code ---------- */
+
+function getDeptCode(deptName: string): string {
+  const stopWords = ["and", "of", "department", "dept.", "dept"];
+  const words = deptName
+    .split(/\s+/)
+    .filter((w) => !stopWords.includes(w.toLowerCase()));
+
+  if (words.length === 0) return "GEN";
+
+  if (words.length === 1) {
+    const w = words[0].replace(/[^a-zA-Z]/g, "");
+    if (w.length >= 3) return w.slice(0, 3).toUpperCase();
+    return w.toUpperCase();
+  }
+
+  return words
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+function getSemesterNumber(semName: string): number {
+  const match = semName.match(/\d+/);
+  if (!match) return 0;
+  return parseInt(match[0], 10);
+}
+
+function buildDisplayCourseCode(
+  deptName: string,
+  semName: string,
+  index: number
+): string {
+  const deptCode = getDeptCode(deptName || "GEN");
+  const semNum = getSemesterNumber(semName || "0");
+  const subjectIndex = String(index + 1).padStart(2, "0"); // 01, 02, 03...
+  // Example: IT-701 for 7th sem, 1st subject
+  return `${deptCode}-${semNum}${subjectIndex}`;
+}
+
+/* --------------------------------------------------- */
+
 export default function TeacherAttendance() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<"select" | "students">("select");
@@ -86,7 +164,7 @@ export default function TeacherAttendance() {
   // Update filtered programs when department changes
   useEffect(() => {
     if (selectedDepartment && hierarchy) {
-      const dept = hierarchy.departments.find(d => d.id === selectedDepartment);
+      const dept = hierarchy.departments.find((d) => d.id === selectedDepartment);
       setFilteredPrograms(dept?.programs || []);
       setSelectedProgram("");
       setSelectedAcademicYear("");
@@ -98,7 +176,7 @@ export default function TeacherAttendance() {
   // Update filtered academic years when program changes
   useEffect(() => {
     if (selectedProgram) {
-      const program = filteredPrograms.find(p => p.id === selectedProgram);
+      const program = filteredPrograms.find((p) => p.id === selectedProgram);
       setFilteredAcademicYears(program?.academicYears || []);
       setSelectedAcademicYear("");
       setSelectedSemester("");
@@ -109,7 +187,7 @@ export default function TeacherAttendance() {
   // Update filtered semesters when academic year changes
   useEffect(() => {
     if (selectedAcademicYear) {
-      const year = filteredAcademicYears.find(y => y.id === selectedAcademicYear);
+      const year = filteredAcademicYears.find((y) => y.id === selectedAcademicYear);
       setFilteredSemesters(year?.semesters || []);
       setSelectedSemester("");
       setSelectedCourse(null);
@@ -119,7 +197,7 @@ export default function TeacherAttendance() {
   // Update filtered courses when semester changes
   useEffect(() => {
     if (selectedSemester) {
-      const semester = filteredSemesters.find(s => s.id === selectedSemester);
+      const semester = filteredSemesters.find((s) => s.id === selectedSemester);
       setFilteredCourses(semester?.courses || []);
       setSelectedCourse(null);
     }
@@ -160,11 +238,11 @@ export default function TeacherAttendance() {
 
       if (res.ok) {
         const data = await res.json();
-        
+
         const studentsData: Student[] = data.students || [];
-        
+
         if (!Array.isArray(studentsData)) {
-          console.error('Invalid students data format:', data);
+          console.error("Invalid students data format:", data);
           alert("Error: Invalid data format received from server");
           setLoading(false);
           return;
@@ -201,12 +279,15 @@ export default function TeacherAttendance() {
         setCurrentView("students");
       } else {
         const errorData = await res.json().catch(() => ({}));
-        console.error('Failed to fetch students:', errorData);
+        console.error("Failed to fetch students:", errorData);
         alert("Failed to fetch students: " + (errorData.error || res.statusText));
       }
     } catch (error) {
       console.error("Failed to fetch students:", error);
-      alert("Error fetching students: " + (error instanceof Error ? error.message : 'Unknown error'));
+      alert(
+        "Error fetching students: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
     } finally {
       setLoading(false);
     }
@@ -219,13 +300,15 @@ export default function TeacherAttendance() {
 
   async function handleTrainStudents() {
     if (!selectedCourse) return;
-    
-    const untrainedStudents = students.filter(s => !s.faceEmbedding);
-    const studentsWithoutPhotos = students.filter(s => !s.hasPhotos);
+
+    const untrainedStudents = students.filter((s) => !s.faceEmbedding);
+    const studentsWithoutPhotos = students.filter((s) => !s.hasPhotos);
 
     if (studentsWithoutPhotos.length > 0) {
-      const studentNames = studentsWithoutPhotos.map(s => s.user.name).join(", ");
-      alert(`⚠️ Warning: The following students don't have photos:\n${studentNames}\n\nPlease ensure they have captured photos using photo.py first.`);
+      const studentNames = studentsWithoutPhotos.map((s) => s.user.name).join(", ");
+      alert(
+        `⚠️ Warning: The following students don't have photos:\n${studentNames}\n\nPlease ensure they have captured photos using photo.py first.`
+      );
       return;
     }
 
@@ -237,7 +320,7 @@ export default function TeacherAttendance() {
     setTraining(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/train", { 
+      const res = await fetch("/api/train", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -260,9 +343,9 @@ export default function TeacherAttendance() {
 
   function handleCaptureAttendance() {
     if (!selectedCourse) return;
-    
-    const trainedStudents = students.filter(s => s.faceEmbedding);
-    
+
+    const trainedStudents = students.filter((s) => s.faceEmbedding);
+
     if (trainedStudents.length === 0) {
       alert("⚠️ No students are trained yet! Please train the model first.");
       return;
@@ -271,7 +354,11 @@ export default function TeacherAttendance() {
     localStorage.setItem("selectedCourseId", selectedCourse.id);
     localStorage.setItem("selectedCourseName", selectedCourse.name);
 
-    router.push(`/teacher/attendance/batches?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(selectedCourse.name)}`);
+    router.push(
+      `/teacher/attendance/batches?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(
+        selectedCourse.name
+      )}`
+    );
   }
 
   function resetSelection() {
@@ -288,356 +375,509 @@ export default function TeacherAttendance() {
     setCurrentView("select");
   }
 
-  const trainedCount = students.filter(s => s.faceEmbedding).length;
-  const withPhotosCount = students.filter(s => s.hasPhotos).length;
+  const trainedCount = students.filter((s) => s.faceEmbedding).length;
+  const withPhotosCount = students.filter((s) => s.hasPhotos).length;
+  const untrainedCount = students.length - trainedCount;
 
   if (loadingHierarchy) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+      <div className="flex justify-center items-center min-h-[240px] text-slate-900">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="text-gray-400 mt-4">Loading course data...</p>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
+          <p className="text-slate-500 mt-3 text-sm">Loading course data...</p>
         </div>
       </div>
     );
   }
 
+  // For course-code generation in selection grid
+  const selectedDeptName =
+    hierarchy?.departments.find((d) => d.id === selectedDepartment)?.name || "";
+  const selectedSemName =
+    filteredSemesters.find((s) => s.id === selectedSemester)?.name || "";
+
+  const statCards = [
+    { title: "Total Students", value: students.length, icon: Users },
+    { title: "Trained", value: trainedCount, icon: CheckCircle2 },
+    { title: "Have Photos", value: withPhotosCount, icon: Camera },
+    { title: "Not Trained", value: untrainedCount, icon: AlertCircle },
+  ];
+
   return (
-    <div className="space-y-6 sm:space-y-8 text-white">
+    <div className="space-y-10 text-slate-900">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Attendance Management
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight flex items-center gap-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white text-xl shadow-[0_4px_10px_rgba(0,0,0,0.35)]">
+              <Camera size={18} />
+            </span>
+            <span>Attendance Management</span>
           </h1>
-          <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
-            {currentView === "select" 
-              ? "Select a course to manage attendance"
+          <p className="text-sm md:text-base text-slate-600 mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
+            {currentView === "select"
+              ? "Choose a course and get your AI attendance ready in a few clicks."
               : `Managing: ${selectedCourse?.name}`}
           </p>
         </div>
+
         {currentView !== "select" && (
-          <button
+          <Button
+            variant="outline"
             onClick={resetSelection}
-            className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[#1a1a1a]/60 border border-white/10 text-white rounded-lg sm:rounded-xl hover:border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] transition-all backdrop-blur-md font-medium text-sm sm:text-base"
+            className="text-sm border-slate-300 text-slate-700 hover:bg-slate-50"
           >
-            ← Back to Selection
-          </button>
+            ← Back to course selection
+          </Button>
         )}
       </div>
 
-      {/* Course Selection View */}
+      {/* When selecting course */}
       {currentView === "select" && (
-        <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl sm:rounded-2xl backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)] p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 flex items-center gap-2">
-            <BookOpen className="text-blue-500" size={20} />
-            <span className="sm:text-xl">Select Course</span>
-          </h2>
-          
-          <div className="space-y-4 sm:space-y-6">
-            {/* Department Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                1. Select Department
-              </label>
-              <select
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-[#0a0a0a] border border-white/10 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white text-sm sm:text-base"
-              >
-                <option value="">-- Choose Department --</option>
-                {hierarchy?.departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Program Selection */}
-            {selectedDepartment && filteredPrograms.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-[2fr,1.4fr]">
+          {/* Left: Course selection card */}
+          <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <BookOpen className="text-indigo-500" size={20} />
+                <span>Select Course</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5 sm:space-y-6">
+              {/* Department Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  2. Select Program
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  1. Department
                 </label>
                 <select
-                  value={selectedProgram}
-                  onChange={(e) => setSelectedProgram(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-[#0a0a0a] border border-white/10 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white text-sm sm:text-base"
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
                 >
-                  <option value="">-- Choose Program --</option>
-                  {filteredPrograms.map((prog) => (
-                    <option key={prog.id} value={prog.id}>
-                      {prog.name}
+                  <option value="">-- Choose Department --</option>
+                  {hierarchy?.departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
 
-            {/* Academic Year Selection */}
-            {selectedProgram && filteredAcademicYears.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  3. Select Academic Year
-                </label>
-                <select
-                  value={selectedAcademicYear}
-                  onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-[#0a0a0a] border border-white/10 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white text-sm sm:text-base"
-                >
-                  <option value="">-- Choose Academic Year --</option>
-                  {filteredAcademicYears.map((year) => (
-                    <option key={year.id} value={year.id}>
-                      {year.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Semester Selection */}
-            {selectedAcademicYear && filteredSemesters.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  4. Select Semester
-                </label>
-                <select
-                  value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-[#0a0a0a] border border-white/10 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white text-sm sm:text-base"
-                >
-                  <option value="">-- Choose Semester --</option>
-                  {filteredSemesters.map((sem) => (
-                    <option key={sem.id} value={sem.id}>
-                      {sem.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Course Selection */}
-            {selectedSemester && filteredCourses.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  5. Select Course
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {filteredCourses.map((course) => (
-                    <div
-                      key={course.id}
-                      onClick={() => handleCourseSelect(course)}
-                      className="p-4 sm:p-6 bg-[#0a0a0a] border border-white/10 rounded-lg sm:rounded-xl hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.15)] cursor-pointer transition-all"
-                    >
-                      <h3 className="text-base sm:text-lg font-semibold mb-2">
-                        {course.name}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-400">
-                        Entry Code:{" "}
-                        <span className="font-mono bg-[#1a1a1a] border border-white/10 px-2 py-1 rounded text-gray-300">
-                          {course.entryCode}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
+              {/* Program Selection */}
+              {selectedDepartment && filteredPrograms.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    2. Program
+                  </label>
+                  <select
+                    value={selectedProgram}
+                    onChange={(e) => setSelectedProgram(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                  >
+                    <option value="">-- Choose Program --</option>
+                    {filteredPrograms.map((prog) => (
+                      <option key={prog.id} value={prog.id}>
+                        {prog.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {loading && (
-            <div className="text-center mt-6">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <p className="text-gray-400 mt-2 text-sm">Loading students...</p>
-            </div>
-          )}
+              {/* Academic Year Selection */}
+              {selectedProgram && filteredAcademicYears.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    3. Academic Year
+                  </label>
+                  <select
+                    value={selectedAcademicYear}
+                    onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                  >
+                    <option value="">-- Choose Academic Year --</option>
+                    {filteredAcademicYears.map((year) => (
+                      <option key={year.id} value={year.id}>
+                        {year.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Semester Selection */}
+              {selectedAcademicYear && filteredSemesters.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    4. Semester
+                  </label>
+                  <select
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                  >
+                    <option value="">-- Choose Semester --</option>
+                    {filteredSemesters.map((sem) => (
+                      <option key={sem.id} value={sem.id}>
+                        {sem.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Course Selection */}
+              {selectedSemester && filteredCourses.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    5. Course
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    {filteredCourses.map((course, index) => {
+                      const displayCode = buildDisplayCourseCode(
+                        selectedDeptName,
+                        selectedSemName,
+                        index
+                      );
+                      return (
+                        <button
+                          type="button"
+                          key={course.id}
+                          onClick={() => handleCourseSelect(course)}
+                          className="text-left p-4 sm:p-5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_10px_25px_rgba(15,23,42,0.08)] transition-all"
+                        >
+                          <p className="text-xs sm:text-sm font-mono text-indigo-600 mb-1">
+                            {displayCode}
+                          </p>
+                          <p className="text-sm sm:text-base font-semibold text-slate-900">
+                            {course.name}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {loading && (
+                <div className="text-center pt-4">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+                  <p className="text-slate-500 mt-2 text-sm">Loading students...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Right: Workflow / Help (mirrors overview bottom card style) */}
+          <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+            <CardHeader className="flex flex-row items-center gap-2 pb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.6)]">
+                <Sparkles size={18} />
+              </div>
+              <CardTitle className="text-base md:text-lg">
+                How AI Attendance Works
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ol className="list-decimal pl-5 space-y-2 text-sm md:text-[15px] text-slate-700">
+                <li>Select your course using the filters on the left.</li>
+                <li>
+                  Ensure students have uploaded photos so the model can recognize them.
+                </li>
+                <li>
+                  Click <strong>Train Model</strong> to generate or update face embeddings.
+                </li>
+                <li>
+                  Once trained, use <strong>Capture Attendance</strong> to start a live
+                  recognition session.
+                </li>
+                <li>
+                  All attendance is automatically linked to this course for reporting.
+                </li>
+              </ol>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Students View */}
+      {/* When in students view */}
       {currentView === "students" && selectedCourse && (
         <>
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-[#1a1a1a]/60 border border-white/10 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all duration-300">
-              <div className="absolute -top-3 sm:-top-4 right-3 sm:right-4 bg-gradient-to-br from-blue-500 to-blue-600 p-2 sm:p-3 rounded-lg sm:rounded-xl text-white shadow-lg">
-                <Users size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <p className="text-xs sm:text-sm font-medium text-gray-400 uppercase mt-2">
-                Total Students
-              </p>
-              <p className="text-2xl sm:text-4xl font-bold text-white mt-2 sm:mt-3">{students.length}</p>
+          {/* Top layout: Stats + Actions (similar to overview top layout) */}
+          <div className="grid gap-6 lg:grid-cols-[2fr,1.3fr]">
+            {/* Stats with gradient style like TeacherOverview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {statCards.map((card, index) => {
+                const Icon = card.icon;
+                const style = STAT_STYLES[index];
+                return (
+                  <Card
+                    key={card.title}
+                    className="relative overflow-hidden border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-all duration-300"
+                  >
+                    <div
+                      className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${style.bg} opacity-90`}
+                    />
+                    <CardContent className="relative p-5 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold tracking-wide text-slate-600 uppercase">
+                          {card.title}
+                        </p>
+                        <p className="text-3xl font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]">
+                          {card.value}
+                        </p>
+                      </div>
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-xl ${style.iconBg} text-white`}
+                      >
+                        <Icon size={22} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
-            <div className="relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-[#1a1a1a]/60 border border-white/10 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all duration-300">
-              <div className="absolute -top-3 sm:-top-4 right-3 sm:right-4 bg-gradient-to-br from-green-500 to-green-600 p-2 sm:p-3 rounded-lg sm:rounded-xl text-white shadow-lg">
-                <CheckCircle2 size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <p className="text-xs sm:text-sm font-medium text-gray-400 uppercase mt-2">
-                Trained
-              </p>
-              <p className="text-2xl sm:text-4xl font-bold text-white mt-2 sm:mt-3">{trainedCount}</p>
-            </div>
+            {/* Actions card (like Quick Actions) */}
+            <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-lg drop-shadow-sm">
+                  <span>Attendance Actions</span>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                    Session
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  onClick={handleTrainStudents}
+                  disabled={training || students.length === 0}
+                  className={`w-full justify-start h-auto py-3 px-4 border border-slate-200 bg-emerald-600 text-white hover:bg-emerald-700 shadow-[0_4px_12px_rgba(16,185,129,0.5)] rounded-xl transition-all ${
+                    training || students.length === 0
+                      ? "opacity-70 cursor-not-allowed shadow-none bg-slate-100 text-slate-400 border-slate-200"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-700/90 text-white">
+                      <PlayCircle size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold leading-tight text-slate-900">
+                        {training ? "Training in progress..." : "Train Model"}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5 leading-snug">
+                        Prepare or update embeddings for all untrained students.
+                      </p>
+                    </div>
+                  </div>
+                </Button>
 
-            <div className="relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-[#1a1a1a]/60 border border-white/10 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all duration-300">
-              <div className="absolute -top-3 sm:-top-4 right-3 sm:right-4 bg-gradient-to-br from-yellow-500 to-yellow-600 p-2 sm:p-3 rounded-lg sm:rounded-xl text-white shadow-lg">
-                <Camera size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <p className="text-xs sm:text-sm font-medium text-gray-400 uppercase mt-2">
-                Have Photos
-              </p>
-              <p className="text-2xl sm:text-4xl font-bold text-white mt-2 sm:mt-3">{withPhotosCount}</p>
-            </div>
+                <Button
+                  onClick={handleCaptureAttendance}
+                  disabled={loading || trainedCount === 0}
+                  className={`w-full justify-start h-auto py-3 px-4 border border-slate-200 bg-indigo-600 text-white hover:bg-indigo-700 shadow-[0_4px_12px_rgba(79,70,229,0.5)] rounded-xl transition-all ${
+                    loading || trainedCount === 0
+                      ? "opacity-70 cursor-not-allowed shadow-none bg-slate-100 text-slate-400 border-slate-200"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-700/90 text-white">
+                      <Camera size={18} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold leading-tight text-slate-900">
+  Capture Attendance
+</p>
+<p className="text-xs text-slate-600 mt-0.5 leading-snug">
+  Open the camera-based recognition screen for this course.
+</p>
 
-            <div className="relative p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-[#1a1a1a]/60 border border-white/10 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.1)] transition-all duration-300">
-              <div className="absolute -top-3 sm:-top-4 right-3 sm:right-4 bg-gradient-to-br from-red-500 to-red-600 p-2 sm:p-3 rounded-lg sm:rounded-xl text-white shadow-lg">
-                <AlertCircle size={20} className="sm:w-6 sm:h-6" />
-              </div>
-              <p className="text-xs sm:text-sm font-medium text-gray-400 uppercase mt-2">
-                Not Trained
-              </p>
-              <p className="text-2xl sm:text-4xl font-bold text-white mt-2 sm:mt-3">{students.length - trainedCount}</p>
-            </div>
+                    </div>
+                  </div>
+                </Button>
+
+                {/* Training progress bar */}
+                {training && (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs sm:text-sm text-emerald-900 space-y-2">
+                    <p className="font-semibold flex items-center gap-2">
+                      <span className="inline-flex h-4 w-4 rounded-full bg-emerald-500" />
+                      Training embeddings for {untrainedCount} untrained student
+                      {untrainedCount === 1 ? "" : "s"}...
+                    </p>
+                    <p className="text-emerald-800/80">
+                      Keep this page open while the training runs on the server.
+                    </p>
+                    <div className="w-full h-2 rounded-full bg-emerald-100 overflow-hidden">
+                      <div className="h-full w-3/4 bg-emerald-500/90 animate-pulse rounded-full" />
+                    </div>
+                  </div>
+                )}
+
+                {trainedCount === 0 && students.length > 0 && !training && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs sm:text-sm text-amber-900">
+                    <p className="font-semibold flex items-center gap-2">
+                      <AlertCircle size={14} />
+                      No students are trained yet.
+                    </p>
+                    <p className="mt-1">
+                      Ensure photos are available and click{" "}
+                      <span className="font-semibold">“Train Model”</span> before capturing
+                      attendance.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <button
-              onClick={handleTrainStudents}
-              disabled={training || students.length === 0}
-              className={`px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl font-medium text-base sm:text-lg transition-all ${
-                training || students.length === 0
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
-              }`}
-            >
-              {training ? "⏳ Training..." : "🧠 Train Model"}
-            </button>
-            <button
-              onClick={handleCaptureAttendance}
-              disabled={loading || trainedCount === 0}
-              className={`px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl font-medium text-base sm:text-lg transition-all ${
-                loading || trainedCount === 0
-                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
-              }`}
-            >
-              📸 Capture Attendance
-            </button>
-          </div>
-
-          {trainedCount === 0 && students.length > 0 && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 backdrop-blur-sm">
-              <p className="text-yellow-300 font-medium text-sm sm:text-base">
-                ⚠️ No students are trained yet. Please train the model first.
-              </p>
-            </div>
-          )}
-
-          {/* Student Training Table */}
-          <div className="bg-[#1a1a1a]/60 border border-white/10 rounded-xl sm:rounded-2xl backdrop-blur-md shadow-[0_0_25px_rgba(255,255,255,0.05)] p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
-              <GraduationCap className="text-blue-500" size={20} />
-              <span>Student Training Status</span>
-            </h2>
-            {students.length === 0 ? (
-              <p className="text-gray-400 text-center py-8 text-sm sm:text-base">
-                No students enrolled in this course.
-              </p>
-            ) : (
-              <div className="overflow-x-auto -mx-4 sm:mx-0">
-                <div className="inline-block min-w-full align-middle">
-                  <table className="min-w-full text-xs sm:text-sm">
-                    <thead className="bg-[#0a0a0a]/60">
-                      <tr>
-                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          #
-                        </th>
-                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          Student Name
-                        </th>
-                        <th className="hidden md:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          Email
-                        </th>
-                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          Photos
-                        </th>
-                        <th className="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          Count
-                        </th>
-                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-300">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/10">
-                      {students.map((student, idx) => (
-                        <tr key={student.id} className="hover:bg-white/5 transition-colors">
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-400">{idx + 1}</td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium text-white">
-                            <div>
-                              <div>{student.user.name}</div>
-                              <div className="md:hidden text-xs text-gray-500 mt-1">{student.user.email}</div>
-                            </div>
-                          </td>
-                          <td className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4 text-gray-400 font-mono text-xs">
-                            {student.user.email}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
-                            {student.hasPhotos ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
-                                ✅
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-                                ❌
-                              </span>
-                            )}
-                          </td>
-                          <td className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 text-gray-400 text-xs">
-                            {student.photoCount || 0}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
-                            {student.faceEmbedding ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                ✅ <span className="hidden sm:inline ml-1">Trained</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                                ⏳ <span className="hidden sm:inline ml-1">Pending</span>
-                              </span>
-                            )}
-                          </td>
+          {/* Bottom layout: Training table + Next steps (like overview bottom layout) */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Student Training Table */}
+            <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <GraduationCap className="text-indigo-500" size={20} />
+                  <span>Student Training Status</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {students.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8 text-sm sm:text-base">
+                    No students enrolled in this course.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="min-w-full text-xs sm:text-sm">
+                      <thead className="bg-slate-50 border-y border-slate-200">
+                        <tr>
+                          <th className="px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            #
+                          </th>
+                          <th className="px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            Student
+                          </th>
+                          <th className="hidden md:table-cell px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            Email
+                          </th>
+                          <th className="px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            Photos
+                          </th>
+                          <th className="hidden sm:table-cell px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            Count
+                          </th>
+                          <th className="px-3 sm:px-6 py-3 text-left font-semibold text-slate-500">
+                            Status
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {students.map((student, idx) => (
+                          <tr
+                            key={student.id}
+                            className="hover:bg-slate-50 transition-colors"
+                          >
+                            <td className="px-3 sm:px-6 py-3 text-slate-500">
+                              {idx + 1}
+                            </td>
+                            <td className="px-3 sm:px-6 py-3">
+                              <div>
+                                <p className="font-medium text-slate-900">
+                                  {student.user.name}
+                                </p>
+                                <p className="md:hidden text-xs text-slate-500 mt-0.5">
+                                  {student.user.email}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="hidden md:table-cell px-3 sm:px-6 py-3 text-xs text-slate-600 font-mono">
+                              {student.user.email}
+                            </td>
+                            <td className="px-3 sm:px-6 py-3">
+                              {student.hasPhotos ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✅
+                                  <span className="hidden sm:inline ml-1">Available</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                                  ❌
+                                  <span className="hidden sm:inline ml-1">Missing</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="hidden sm:table-cell px-3 sm:px-6 py-3 text-xs text-slate-600">
+                              {student.photoCount || 0}
+                            </td>
+                            <td className="px-3 sm:px-6 py-3">
+                              {student.faceEmbedding ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  ✅
+                                  <span className="hidden sm:inline ml-1">Trained</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                  ⏳
+                                  <span className="hidden sm:inline ml-1">Pending</span>
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Quick Info */}
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-6 backdrop-blur-sm">
-            <h3 className="text-base sm:text-lg font-semibold text-blue-300 mb-3">
-              📋 Next Steps
-            </h3>
-            <ol className="space-y-2 text-blue-200 text-sm sm:text-base">
-              {trainedCount === 0 ? (
-                <>
-                  <li>1. ✅ Ensure students have captured their photos using photo.py</li>
-                  <li>2. 🧠 Click "Train Model" to train the AI</li>
-                  <li>3. 📸 After training, click "Capture Attendance" to mark attendance</li>
-                </>
-              ) : (
-                <>
-                  <li>✅ Training complete! You can now capture attendance</li>
-                  <li>📸 Click "Capture Attendance" to open the camera and recognize students</li>
-                  <li>📊 View attendance history after submitting records</li>
-                </>
-              )}
-            </ol>
+            {/* Next steps / Info (styled like overview’s bottom card) */}
+            <Card className="border border-indigo-200 bg-indigo-50 rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.06)]">
+              <CardContent className="p-4 sm:p-5 text-sm sm:text-base text-indigo-900 space-y-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <span>📋 Next Steps</span>
+                </h3>
+                <ol className="list-decimal pl-5 space-y-1.5">
+                  {trainedCount === 0 ? (
+                    <>
+                      <li>Ensure each student has captured photos using your photo tool.</li>
+                      <li>
+                        Click <span className="font-semibold">“Train Model”</span> to
+                        generate embeddings.
+                      </li>
+                      <li>
+                        After training, use{" "}
+                        <span className="font-semibold">“Capture Attendance”</span> to record
+                        today&apos;s class.
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li>
+                        Use the <span className="font-semibold">“Capture Attendance”</span>{" "}
+                        action to start a live session.
+                      </li>
+                      <li>Ask students to look at the camera for accurate detection.</li>
+                      <li>Review your attendance reports from the Reports section.</li>
+                    </>
+                  )}
+                </ol>
+                {untrainedCount > 0 && (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs sm:text-sm text-amber-900">
+                    <p className="font-semibold flex items-center gap-2">
+                      <AlertCircle size={14} />
+                      Some students are still untrained.
+                    </p>
+                    <p className="mt-1">
+                      {untrainedCount} student
+                      {untrainedCount === 1 ? " has" : "s have"} no embeddings yet. They
+                      may not be recognized during capture.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </>
       )}

@@ -1,22 +1,29 @@
+// app/api/admin/stats/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Count teachers
-    const teachers = await prisma.user.count({ where: { role: Role.TEACHER } });
-    // Count students
-    const students = await prisma.user.count({ where: { role: Role.STUDENT } });
-    // Count departments
-    const departments = await prisma.department.count();
-    // Count programs
-    const programs = await prisma.program.count();
+    // Use Prisma count queries
+    const [teachersCount, studentsCount, departmentsCount, programsCount, coursesCount] =
+      await Promise.all([
+        prisma.teacher.count(),
+        prisma.student.count(),
+        prisma.department.count(),
+        prisma.program.count(),
+        prisma.course.count(),
+      ]);
 
-    return NextResponse.json({ teachers, students, departments, programs });
-  } catch (error) {
-    console.error("Error fetching stats:", error);
+    return NextResponse.json({
+      teachers: teachersCount,
+      students: studentsCount,
+      departments: departmentsCount,
+      programs: programsCount,
+      courses: coursesCount,
+      success: true,
+    });
+  } catch (err) {
+    console.error("GET /api/admin/stats error:", err);
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 }

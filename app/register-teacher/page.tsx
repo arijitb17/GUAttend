@@ -6,116 +6,149 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function TeacherRegister() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  async function handleRegister() {
-    const res = await fetch("/api/auth/register-teacher", {
-      method: "POST",
-      body: JSON.stringify({ name, email, password }),
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setMessage(data.message);
+  async function handleRegister(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setLoading(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/auth/register-teacher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Registration failed");
+      setMessage(data.message || "Registered successfully. Please login.");
+      // clear fields on success
       setName("");
       setEmail("");
       setPassword("");
-    } else {
-      setMessage(data.error);
+      // optionally redirect to login after short delay
+      setTimeout(() => router.push("/login"), 900);
+    } catch (err: any) {
+      setMessage(err.message || "Registration error");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#0e0e0e] text-white font-[Poppins]">
-      {/* --- University Logo & Header --- */}
-      <div className="flex flex-col items-center mb-8 text-center">
-        <Image
-          src="/logo.png"
-          alt="Gauhati University Logo"
-          width={100}
-          height={100}
-          className="mb-3 drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]"
-        />
-        <h1 className="text-2xl font-bold tracking-wide">Gauhati University</h1>
-        <p className="text-gray-400 text-sm">
-          GUAttend — Smart Attendance System for Faculty
-        </p>
+    <div className="min-h-screen flex">
+      {/* Left image (large) */}
+      <div className="hidden lg:flex lg:w-7/12 xl:w-3/5 relative">
+        <Image src="/bg-left.png" alt="Campus" fill className="object-cover" priority />
+        <div className="absolute inset-0 bg-black/0" />
       </div>
 
-      {/* --- Registration Card --- */}
-      <div className="relative w-96 p-8 rounded-2xl bg-[#1a1a1a]/70 backdrop-blur-lg border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.05)]">
-        <h2 className="text-2xl font-semibold text-center mb-6 tracking-wide">
-          Teacher Registration
-        </h2>
+      {/* Right panel */}
+      <div className="flex-1 lg:w-5/12 xl:w-2/5 flex items-center justify-center bg-white">
+        <div className="w-full max-w-md px-8 py-12">
+          {/* Logo & header */}
+          <div className="flex flex-col items-center mb-6 text-center">
+            <Image src="/logo.png" alt="University Logo" width={92} height={92} className="mb-4" />
 
-        <div className="space-y-4">
-          <input
-            type="text"
-            placeholder="Full Name"
-            className="w-full p-3 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+            {/* Department (bigger, one line) */}
+            <h3 className="text-2xl font-semibold text-black leading-tight whitespace-nowrap">
+              Department of Information Technology
+            </h3>
 
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-3 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          {/* --- Password Field with Eye Icon --- */}
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              className="w-full p-3 pr-10 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/50 placeholder-gray-400 transition"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <span
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 cursor-pointer text-gray-400 hover:text-white transition"
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </span>
+            {/* GUAttend subtitle (smaller, one line) */}
+            <h1 className="mt-1 text-base font-medium text-black opacity-80 whitespace-nowrap">
+              GUAttend — Gauhati University's Smart Attendance System
+            </h1>
           </div>
 
-          <button
-            onClick={handleRegister}
-            className="w-full bg-white text-black font-semibold p-3 rounded-lg hover:bg-gray-200 transition-all duration-200 cursor-pointer"
+          {/* Card */}
+          <form
+            onSubmit={handleRegister}
+            className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-200"
           >
-            Register
-          </button>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-600">Full Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter full name"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-0 focus:border-black placeholder-gray-400"
+              />
 
-          {message && (
-            <p className="text-center text-gray-300 mt-4 text-sm">{message}</p>
-          )}
+              <label className="block text-sm font-medium text-gray-600">Email</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-0 focus:border-black placeholder-gray-400"
+              />
+
+              <label className="block text-sm font-medium text-gray-600">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 focus:ring-0 focus:border-black placeholder-gray-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              <button
+  type="submit"
+  disabled={loading}
+  className="custom-btn w-full mt-2 py-3 rounded-lg font-semibold bg-black text-white hover:bg-gray-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  {loading ? "Registering..." : "Register"}
+</button>
+
+
+              {message && (
+                <p
+                  className={`text-center mt-2 text-sm ${
+                    message.toLowerCase().includes("error") || message.toLowerCase().includes("failed")
+                      ? "text-red-500"
+                      : "text-gray-700"
+                  }`}
+                >
+                  {message}
+                </p>
+              )}
+            </div>
+          </form>
+
+          <p className="text-center text-sm text-gray-600 mt-5">
+            Already a Faculty Member?{" "}
+            <span onClick={() => router.push("/login")} className="text-blue-600 underline cursor-pointer">
+              Login
+            </span>
+           {" "}Here
+          </p>
         </div>
-
-        <p className="text-center text-gray-400 mt-6 text-sm">
-          Already have an account?{" "}
-          <span
-            onClick={() => router.push("/login")}
-            className="text-white hover:underline cursor-pointer"
-          >
-            Login
-          </span>
-        </p>
-
-        <div className="absolute inset-0 rounded-2xl border border-white/10 pointer-events-none" />
       </div>
 
-      {/* --- Footer --- */}
-      <p className="text-gray-500 text-xs mt-8">
-        © {new Date().getFullYear()} Gauhati University • All Rights Reserved
-      </p>
+      {/* Mobile: show image above the card */}
+      <div className="lg:hidden w-full h-56 relative">
+        <Image src="/bg-left.png" alt="Campus" fill className="object-cover" />
+      </div>
     </div>
   );
 }

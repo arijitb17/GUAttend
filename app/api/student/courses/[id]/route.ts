@@ -11,8 +11,10 @@ interface JWTPayload {
   role: string;
 }
 
-
-export async function GET(request: NextRequest, context: any) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> } // <- params is a Promise
+) {
   try {
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -41,7 +43,8 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    const { id: courseId } = context.params;
+    // ✅ Correct way: await params
+    const { id: courseId } = await params;
 
     // Verify student exists
     const student = await prisma.student.findUnique({
@@ -98,8 +101,8 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    // Exclude `students` field before returning
-    const { students: _, ...courseData } = course;
+    // Exclude `students` before returning
+    const { students: _ignored, ...courseData } = course;
 
     return NextResponse.json(courseData, { status: 200 });
   } catch (error) {
