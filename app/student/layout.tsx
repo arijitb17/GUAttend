@@ -55,23 +55,49 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const navItems = [
     { href: "/student", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { href: "/student/courses", label: "My Courses", icon: <BookOpen size={18} /> },
-    { href: "/student/history", label: "Attendance History", icon: <ClipboardList size={18} /> },
+    {
+      href: "/student/history",
+      label: "Attendance History",
+      icon: <ClipboardList size={18} />,
+    },
     { href: "/student/profile", label: "Profile", icon: <User size={18} /> },
   ];
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-slate-900 font-[Poppins]">
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-900">
-            <GraduationCap size={20} />
-            <span>Student</span>
-          </h2>
+      {/* Mobile / Tablet Header */}
+      <div
+        className="
+          lg:hidden fixed top-0 left-0 right-0 z-50
+          bg-[var(--text-black)] text-[var(--text-white)]
+          border-b border-[var(--card-border)]
+          px-4 py-3 flex items-center justify-between
+        "
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="
+              h-8 w-8 rounded-xl
+              bg-[var(--text-white)] text-[var(--text-black)]
+              flex items-center justify-center
+              shadow-[0_6px_18px_rgba(0,0,0,0.55)]
+            "
+          >
+            <GraduationCap size={18} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold tracking-wide">
+              Student Portal
+            </span>
+            <span className="text-[11px] text-[var(--secondary)] truncate">
+              {studentName}
+            </span>
+          </div>
         </div>
+
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-[rgba(255,255,255,0.08)] rounded-lg transition-colors"
         >
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -102,10 +128,17 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         {/* Spacer for mobile header */}
         <div className="h-14 lg:h-0" />
 
-        {/* Header / Brand */}
-        <div className="px-5 pt-4 pb-5 border-b border-[var(--card-border)]">
+        {/* Header / Brand – ONLY on lg+ */}
+        <div className="px-5 pt-4 pb-5 border-b border-[var(--card-border)] hidden lg:block">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-[var(--text-white)] text-[var(--text-black)] flex items-center justify-center text-lg font-semibold shadow-[0_6px_20px_rgba(0,0,0,0.6)]">
+            <div
+              className="
+                h-9 w-9 rounded-xl
+                bg-[var(--text-white)] text-[var(--text-black)]
+                flex items-center justify-center text-lg font-semibold
+                shadow-[0_6px_20px_rgba(0,0,0,0.6)]
+              "
+            >
               <GraduationCap size={18} />
             </div>
             <div className="flex flex-col">
@@ -120,7 +153,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 pt-4 pb-3 space-y-1 overflow-y-auto">
+        <nav
+          className="
+            flex-1 px-3 pb-3 space-y-1 overflow-y-auto
+            pt-4 lg:pt-4
+            mt-6 lg:mt-0
+          "
+        >
           {navItems.map((item) => {
             const isActive = pathname === item.href;
 

@@ -70,14 +70,21 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    // ✅ Fetch attendance records
+    // ✅ Fetch attendance records (include course code & entryCode from DB)
     const attendanceRecords = await prisma.attendance.findMany({
       where: { studentId: student.id, courseId },
       select: {
         id: true,
         status: true,
         timestamp: true,
-        course: { select: { name: true } },
+        course: {
+          select: {
+            id: true,
+            name: true,
+            code: true,       // ← from DB
+            entryCode: true,  // ← from DB (optional but useful)
+          },
+        },
       },
       orderBy: { timestamp: "desc" },
     });

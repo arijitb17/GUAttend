@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Get student record
+    // ✅ Get student record
     const student = await prisma.student.findUnique({
       where: { userId: decoded.userId },
     });
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    // Get all attendance records for this student with course details
+    // ✅ Get all attendance records for this student with course details
     const attendanceRecords = await prisma.attendance.findMany({
       where: {
         studentId: student.id,
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         course: {
           select: {
             name: true,
-            entryCode: true,
+            code: true,      // 👈 use the real `code` field from DB
           },
         },
       },
@@ -49,13 +49,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Format the records
+    // ✅ Format the records for frontend
     const formattedRecords = attendanceRecords.map((record) => ({
       id: record.id,
-      course: {
-        name: record.course.name,
-        entryCode: record.course.entryCode,
-      },
+      course: record.course
+        ? {
+            name: record.course.name,
+            code: record.course.code, 
+          }
+        : {
+            name: "Unknown Course",
+            code: "N/A",
+          },
       status: record.status,
       timestamp: record.timestamp.toISOString(),
     }));

@@ -37,107 +37,115 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left side image */}
-      <div className="hidden lg:flex lg:w-7/12 xl:w-3/5 relative">
+    <div className="min-h-screen flex flex-col md:flex-row bg-white">
+      {/* Left image section – narrower on tablet/desktop */}
+      <div className="relative w-full h-56 sm:h-64 md:h-auto md:w-5/12 lg:w-1/2 overflow-hidden">
         <Image
           src="/bg-left.png"
           alt="Campus"
           fill
-          className="object-cover"
           priority
+          className="object-cover object-center"
         />
+        <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-black/40 to-black/10" />
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 lg:w-5/12 xl:w-2/5 flex items-center justify-center bg-white">
-        <div className="w-full max-w-md px-8 py-12 flex flex-col items-center">
-
-          {/* Logo + Titles */}
+      {/* Right login panel – wider on tablet/desktop */}
+      <div className="flex-1 flex items-center justify-center md:w-7/12 lg:w-1/2 px-3 sm:px-5 md:px-8 py-8 md:py-10">
+        <div className="w-full flex flex-col items-center text-center">
           <Image
             src="/logo.png"
             alt="University Logo"
-            width={92}
-            height={92}
+            width={90}
+            height={90}
             className="mb-4"
           />
 
-          {/* One-line department name */}
-          <h3 className="text-2xl font-semibold text-black whitespace-nowrap">
+          {/* Department name – ALWAYS one line */}
+          <h3
+            className="
+              font-semibold text-black leading-tight tracking-tight
+              whitespace-nowrap
+              text-[3.4vw]      /* very small screens */
+              sm:text-xl       /* phones ≥640px */
+              lg:text-3xl       /* large screens */
+            "
+          >
             Department of Information Technology
           </h3>
 
-          {/* One-line GUAttend text */}
-          <h1 className="mt-1 text-base font-medium text-black opacity-80 whitespace-nowrap">
-            GUAttend — Gauhati University's first Smart Attendance System
-          </h1>
+          {/* Subtitle – ALWAYS one line */}
+          <p
+            className="
+              mt-1 text-black opacity-80 leading-snug tracking-tight
+              whitespace-nowrap
+              text-[2.9vw]      /* very small screens */
+              sm:text-sm
+              lg:text-lg
+            "
+          >
+            GUAttend — Gauhati University&apos;s Smart Attendance System
+          </p>
 
-          {/* Login Card */}
+          {/* Login form – width limited, text area not */}
           <form
             onSubmit={handleLogin}
-            className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-200 w-full"
+            className="mt-6 w-full max-w-md bg-white rounded-xl p-6 shadow-md border border-gray-200"
           >
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-600 whitespace-nowrap">
-                Email
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-0 focus:border-black placeholder-gray-400"
-              />
-
-              <label className="block text-sm font-medium text-gray-600 whitespace-nowrap">
-                Password
-              </label>
-              <div className="relative">
+              <div className="space-y-1 text-left">
+                <label className="text-sm font-medium">Email</label>
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="email"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 focus:ring-0 focus:border-black placeholder-gray-400"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-sm font-medium">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="w-full px-4 py-3 pr-11 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="custom-btn w-full mt-2 py-3 rounded-lg font-semibold bg-black text-white hover:bg-blue-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="custom-btn w-full mt-2 py-3 rounded-lg font-semibold bg-black text-white hover:bg-blue-500 transition disabled:opacity-60"
               >
                 {loading ? "Logging in..." : "Log In"}
               </button>
             </div>
           </form>
 
-          {/* One-line welcome message */}
-          <p className="text-sm text-gray-600 mt-5 whitespace-nowrap text-center">
-            Welcome to the Department! Please{" "}
+          <p className="text-sm text-gray-600 mt-5">
+            New to the Department?{" "}
             <span
-              onClick={() => router.push("/register-teacher")}
               className="text-blue-600 underline cursor-pointer"
+              onClick={() => router.push("/register-teacher")}
             >
-              Register
-            </span>{" "}
-            to Get Started.
+              Register here
+            </span>
           </p>
         </div>
-      </div>
-
-      {/* Mobile image */}
-      <div className="lg:hidden w-full h-56 relative">
-        <Image src="/bg-left.png" alt="Campus" fill className="object-cover" />
       </div>
     </div>
   );

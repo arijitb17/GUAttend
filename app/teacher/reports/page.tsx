@@ -18,7 +18,7 @@ import {
 interface Course {
   id: string;
   name: string;
-  entryCode: string;
+  code: string;
 }
 
 interface AttendanceReport {
@@ -239,7 +239,7 @@ export default function TeacherReports() {
                 <option value="">Choose a course</option>
                 {courses.map((course) => (
                   <option key={course.id} value={course.id}>
-                    {course.name} ({course.entryCode})
+                    {course.name} ({course.code})
                   </option>
                 ))}
               </select>

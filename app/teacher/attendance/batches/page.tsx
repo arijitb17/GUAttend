@@ -65,7 +65,10 @@ export default function AttendanceCapturePage() {
   const [capturing, setCapturing] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
   const [capturedFrames, setCapturedFrames] = useState<Blob[]>([]);
-  const [recognitionResult, setRecognitionResult] = useState<RecognitionResult | null>(null);
+  const [capturedFrameUrls, setCapturedFrameUrls] = useState<string[]>([]);
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null);
+  const [recognitionResult, setRecognitionResult] =
+    useState<RecognitionResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistory>({});
@@ -100,9 +103,19 @@ export default function AttendanceCapturePage() {
 
     return () => {
       stopCamera();
+      setCapturedFrameUrls((prev) => {
+        prev.forEach((url) => URL.revokeObjectURL(url));
+        return [];
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    return () => {
+      capturedFrameUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [capturedFrameUrls]);
 
   async function fetchStudents(courseId: string) {
     try {
@@ -182,6 +195,8 @@ export default function AttendanceCapturePage() {
 
     setCapturing(true);
     setCapturedFrames([]);
+    setCapturedFrameUrls([]);
+    setSelectedFrameIndex(null);
     setRecognitionResult(null);
 
     const video = videoRef.current;
@@ -221,18 +236,26 @@ export default function AttendanceCapturePage() {
       }
 
       setCapturedFrames(frames);
-      setCapturing(false);
 
-      await recognizeFaces(frames);
+      setCapturedFrameUrls((prev) => {
+        prev.forEach((url) => URL.revokeObjectURL(url));
+        return frames.map((frame) => URL.createObjectURL(frame));
+      });
+
+      setSelectedFrameIndex(0);
     } catch (error) {
       console.error("Capture error:", error);
       alert("Failed to capture frames");
+    } finally {
       setCapturing(false);
     }
   }
 
   async function recognizeFaces(frames: Blob[]) {
-    if (!courseId) return;
+    if (!courseId || frames.length === 0) {
+      alert("No frames available for recognition.");
+      return;
+    }
 
     try {
       setRecognizing(true);
@@ -262,7 +285,6 @@ export default function AttendanceCapturePage() {
       console.log("RAW /api/recognize response:", result);
       console.log("Loaded students (before normalize):", students);
 
-      // if no students loaded yet, fetch them
       if ((!students || students.length === 0) && typeof fetchStudents === "function") {
         try {
           await fetchStudents(courseId);
@@ -272,7 +294,6 @@ export default function AttendanceCapturePage() {
         }
       }
 
-      // helper to match recognized IDs to known students
       function findStudentByCandidate(candidate: string | null | undefined) {
         if (!candidate) return null;
         const s = String(candidate).trim();
@@ -290,14 +311,12 @@ export default function AttendanceCapturePage() {
         return found || null;
       }
 
-      // normalize recognized students
       const rawRec = result.recognizedStudents || [];
       const normalized: RecognitionStudent[] = rawRec.map((item: any, idx: number) => {
         console.log(`recognizedStudents[${idx}] raw:`, item);
 
         if (!item) return { id: "unknown", name: "unknown", email: "" };
 
-        // case 1: backend returned a string ID
         if (typeof item === "string") {
           const idStr = item.trim();
           const found = findStudentByCandidate(idStr);
@@ -306,7 +325,6 @@ export default function AttendanceCapturePage() {
           return { id: idStr, name: idStr, email: "" };
         }
 
-        // case 2: backend returned object
         if (typeof item === "object") {
           const possibleFields = [
             item.id,
@@ -334,11 +352,9 @@ export default function AttendanceCapturePage() {
           };
         }
 
-        // fallback for unexpected type
         return { id: String(item), name: String(item), email: "" };
       });
 
-      // normalize detections
       const rawDetections: any[] = result.detections || [];
       const normalizedDetections: RecognitionDetection[] = rawDetections.map((d: any) => ({
         imageIndex: d.imageIndex ?? d.frameIndex ?? 0,
@@ -351,7 +367,6 @@ export default function AttendanceCapturePage() {
         studentId: d.studentId ?? d.id ?? null,
       }));
 
-      // preliminary result
       const normalizedResult: RecognitionResult = {
         totalFaces: Number(result.totalFaces ?? normalizedDetections.length ?? 0),
         recognizedStudents: normalized,
@@ -362,7 +377,6 @@ export default function AttendanceCapturePage() {
         detections: normalizedDetections,
       };
 
-      // ✅ resolve missing names (call backend only if needed)
       const missingIds = normalized
         .filter((s) => s && (!s.name || s.name === s.id))
         .map((s) => s.id)
@@ -413,7 +427,6 @@ export default function AttendanceCapturePage() {
         }
       }
 
-      // fallback: just use normalized result
       console.log("✅ Normalized recognitionResult (set to state):", normalizedResult);
       setRecognitionResult(normalizedResult);
     } catch (error) {
@@ -456,6 +469,11 @@ export default function AttendanceCapturePage() {
         await fetchAttendanceHistory(courseId);
 
         setCapturedFrames([]);
+        setCapturedFrameUrls((prev) => {
+          prev.forEach((url) => URL.revokeObjectURL(url));
+          return [];
+        });
+        setSelectedFrameIndex(null);
         setRecognitionResult(null);
         stopCamera();
       } else {
@@ -495,67 +513,69 @@ export default function AttendanceCapturePage() {
   );
 
   return (
-    <div className="space-y-8 text-slate-900">
+    <div className="space-y-8 text-slate-900 px-3 sm:px-4 md:px-6 py-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
+        <div className="w-full md:w-auto">
           <Button
             variant="ghost"
             onClick={goBack}
-            className="px-0 h-auto mb-2 text-slate-600 hover:text-slate-900 hover:bg-transparent text-sm flex items-center gap-1"
+            className="px-0 h-auto mb-2 text-slate-600 hover:text-slate-900 hover:bg-transparent text-xs sm:text-sm flex items-center gap-1"
           >
             ← <span>Back to Attendance Setup</span>
           </Button>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight flex items-center gap-2 flex-wrap">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
               <Camera size={18} />
             </span>
             <span>Face Recognition Attendance</span>
           </h1>
-          <p className="text-sm md:text-base text-slate-600 mt-1">
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-1">
             {courseName || "Course attendance capture using AI-based face recognition."}
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => setShowHistory(!showHistory)}
-          className="inline-flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 text-sm"
-        >
-          <History size={16} />
-          <span>{showHistory ? "Hide History" : "View History"}</span>
-        </Button>
+        <div className="w-full md:w-auto flex justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setShowHistory(!showHistory)}
+            className="inline-flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 text-xs sm:text-sm"
+          >
+            <History size={16} />
+            <span>{showHistory ? "Hide History" : "View History"}</span>
+          </Button>
+        </div>
       </div>
 
       {/* Top stats (when NOT viewing history) */}
       {!showHistory && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <Card className="border border-slate-200 bg-white rounded-2xl shadow-sm">
             <CardContent className="p-4 sm:p-5">
-              <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <p className="text-[11px] sm:text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 Total Students
               </p>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold mt-1 text-slate-900">
                 {students.length}
               </p>
             </CardContent>
           </Card>
           <Card className="border border-emerald-200 bg-emerald-50 rounded-2xl shadow-sm">
             <CardContent className="p-4 sm:p-5">
-              <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase flex items-center gap-1">
+              <p className="text-[11px] sm:text-xs font-semibold tracking-wide text-emerald-700 uppercase flex items-center gap-1">
                 <CheckCircle2 size={14} /> Trained Students
               </p>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 text-emerald-800">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold mt-1 text-emerald-800">
                 {trainedStudents}
               </p>
             </CardContent>
           </Card>
           <Card className="border border-amber-200 bg-amber-50 rounded-2xl shadow-sm">
             <CardContent className="p-4 sm:p-5">
-              <p className="text-xs font-semibold tracking-wide text-amber-700 uppercase flex items-center gap-1">
+              <p className="text-[11px] sm:text-xs font-semibold tracking-wide text-amber-700 uppercase flex items-center gap-1">
                 <AlertCircle size={14} /> Untrained Students
               </p>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 text-amber-800">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold mt-1 text-amber-800">
                 {untrainedStudents}
               </p>
             </CardContent>
@@ -563,20 +583,20 @@ export default function AttendanceCapturePage() {
         </div>
       )}
 
-      {/* Attendance History (toggle view) */}
+      {/* Attendance History */}
       {showHistory && (
         <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+          <CardHeader className="pb-3 px-4 sm:px-5 pt-4 sm:pt-5">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl">
               <History size={20} className="text-indigo-500" />
               <span>Attendance History</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 px-4 sm:px-5 pb-4 sm:pb-5">
             {historyEntries.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-slate-500 text-sm md:text-base">
+              <div className="text-center py-10 sm:py-12">
+                <p className="text-3xl sm:text-4xl mb-3">📋</p>
+                <p className="text-slate-500 text-sm sm:text-base">
                   No attendance records yet for this course.
                 </p>
               </div>
@@ -592,10 +612,10 @@ export default function AttendanceCapturePage() {
                       key={date}
                       className="border border-slate-200 bg-slate-50 rounded-2xl overflow-hidden"
                     >
-                      <CardHeader className="px-4 py-3 border-b border-slate-200">
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+                      <CardHeader className="px-4 sm:px-5 py-3 border-b border-slate-200">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 sm:gap-3">
                           <div>
-                            <p className="font-semibold text-slate-900 text-sm md:text-base">
+                            <p className="font-semibold text-slate-900 text-sm sm:text-base">
                               {new Date(date).toLocaleDateString("en-US", {
                                 weekday: "long",
                                 year: "numeric",
@@ -603,19 +623,19 @@ export default function AttendanceCapturePage() {
                                 day: "numeric",
                               })}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-[11px] sm:text-xs text-slate-500">
                               {courseName || "Course attendance"}
                             </p>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs md:text-sm text-slate-600">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <span className="text-[11px] sm:text-xs md:text-sm text-slate-600">
                               Present:{" "}
                               <span className="font-semibold text-emerald-600">
                                 {presentCount}
                               </span>{" "}
                               / {totalCount}
                             </span>
-                            <span className="px-3 py-1 rounded-full text-xs md:text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-3 py-1 rounded-full text-[11px] sm:text-xs md:text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                               {attendanceRate}% attendance
                             </span>
                           </div>
@@ -626,13 +646,13 @@ export default function AttendanceCapturePage() {
                           {records.map((record) => (
                             <div
                               key={`${record.studentId}-${record.timestamp}`}
-                              className="px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 hover:bg-white"
+                              className="px-4 sm:px-5 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 hover:bg-white text-sm"
                             >
                               <div>
-                                <p className="font-medium text-sm md:text-base text-slate-900">
+                                <p className="font-medium text-slate-900">
                                   {record.studentName}
                                 </p>
-                                <p className="text-xs md:text-sm text-slate-500 break-all">
+                                <p className="text-xs text-slate-500 break-all">
                                   {record.studentEmail}
                                 </p>
                               </div>
@@ -640,7 +660,7 @@ export default function AttendanceCapturePage() {
                                 className={`px-3 py-1 rounded-full text-xs md:text-sm font-medium ${
                                   record.status
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-rose-50 text-rose-700 border-rose-200 border"
                                 }`}
                               >
                                 {record.status ? "✔ Present" : "✗ Absent"}
@@ -658,30 +678,30 @@ export default function AttendanceCapturePage() {
         </Card>
       )}
 
-      {/* Camera + Recognition side-by-side (when not viewing history) */}
+      {/* Camera + Recognition – stacked on mobile, side-by-side on large screens */}
       {!showHistory && (
-        <div className="grid gap-6 lg:grid-cols-[3fr,2fr] items-start">
+        <div className="grid gap-6 lg:grid-cols-2 items-start">
           {/* Camera Card */}
           <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(79,70,229,0.6)]">
+            <CardHeader className="pb-3 px-4 sm:px-5 pt-4 sm:pt-5 flex flex-row items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-[0_6px_18px_rgba(79,70,229,0.6)]">
                   <Camera size={18} />
                 </div>
                 <div>
-                  <CardTitle className="text-base md:text-lg">
+                  <CardTitle className="text-sm sm:text-base md:text-lg">
                     Camera Capture
                   </CardTitle>
-                  <p className="text-xs md:text-sm text-slate-500">
+                  <p className="text-[11px] sm:text-xs md:text-sm text-slate-500">
                     Capture frames and run face recognition.
                   </p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 sm:px-5 pb-4 sm:pb-5">
               {/* Video Preview */}
               <div
-                className="relative bg-black rounded-xl overflow-hidden border border-slate-200"
+                className="relative bg-black rounded-xl overflow-hidden border border-slate-200 w-full"
                 style={{ aspectRatio: "16/9" }}
               >
                 <video
@@ -696,13 +716,13 @@ export default function AttendanceCapturePage() {
                 {!cameraActive && (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
                     <div className="text-center px-4">
-                      <p className="text-4xl mb-2">📷</p>
-                      <p className="text-slate-100 text-sm md:text-base mb-3">
+                      <p className="text-3xl sm:text-4xl mb-2">📷</p>
+                      <p className="text-slate-100 text-xs sm:text-sm md:text-base mb-3">
                         Camera is currently off
                       </p>
                       <Button
                         onClick={startCamera}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-slate-800 text-sm md:text-base px-5 py-2.5 shadow-[0_10px_25px_rgba(79,70,229,0.55)]"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-slate-800 text-sm md:text-base px-4 sm:px-5 py-2.5 shadow-[0_10px_25px_rgba(79,70,229,0.55)]"
                       >
                         Start Camera
                       </Button>
@@ -713,8 +733,8 @@ export default function AttendanceCapturePage() {
                 {(capturing || recognizing) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                     <div className="text-center px-4">
-                      <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-t-4 border-indigo-500 mb-3 mx-auto" />
-                      <p className="text-white text-sm md:text-base font-medium">
+                      <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 border-t-4 border-indigo-500 mb-3 mx-auto" />
+                      <p className="text-white text-xs sm:text-sm md:text-base font-medium">
                         {capturing
                           ? "Capturing frames..."
                           : "Running face recognition..."}
@@ -728,90 +748,174 @@ export default function AttendanceCapturePage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 {cameraActive ? (
                   <>
-                      <Button
-    onClick={captureFrames}
-    disabled={capturing || recognizing}
-    className={`flex-1 h-auto py-3 sm:py-4 px-4 sm:px-5 justify-start text-left rounded-2xl border transition-all duration-300
-      ${
-        capturing || recognizing
-          ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-          : "bg-white border-slate-300 hover:bg-slate-50 text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
-      }`}
-  >
-    <div className="flex items-center gap-3 sm:gap-4">
-      <div
-        className={`flex h-10 w-10 items-center justify-center rounded-xl border
-          ${
-            capturing || recognizing
-              ? "bg-slate-200 border-slate-300 text-slate-500"
-              : "bg-slate-100 border-slate-300 text-slate-700"
-          }`}
-      >
-        <span className="text-lg">📸</span>
-      </div>
+                    <Button
+                      onClick={captureFrames}
+                      disabled={capturing || recognizing}
+                      className={`flex-1 h-auto py-3 sm:py-4 px-4 sm:px-5 justify-start text-left rounded-2xl border transition-all duration-300
+                        ${
+                          capturing || recognizing
+                            ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                            : "bg-white border-slate-300 hover:bg-slate-50 text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
+                        }`}
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div
+                          className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border
+                            ${
+                              capturing || recognizing
+                                ? "bg-slate-200 border-slate-300 text-slate-500"
+                                : "bg-slate-100 border-slate-300 text-slate-700"
+                            }`}
+                        >
+                          <span className="text-lg">📸</span>
+                        </div>
 
-      <div className="flex-1">
-        <p className="text-sm sm:text-base font-semibold leading-tight text-slate-800">
-          {capturing
-            ? "Capturing..."
-            : recognizing
-            ? "Recognizing..."
-            : "Start Capture"}
-        </p>
+                        <div className="flex-1">
+                          <p className="text-sm sm:text-base font-semibold leading-tight text-slate-800">
+                            {capturing
+                              ? "Capturing..."
+                              : recognizing
+                              ? "Recognizing..."
+                              : "Start Capture"}
+                          </p>
 
-        <p
-          className={`mt-0.5 text-xs sm:text-[13px] leading-snug
-            ${
-              capturing || recognizing
-                ? "text-slate-500"
-                : "text-slate-600"
-            }`}
-        >
-          Capture multiple frames for accurate face recognition.
-        </p>
-      </div>
-    </div>
-  </Button>
+                          <p
+                            className={`mt-0.5 text-[11px] sm:text-xs leading-snug
+                              ${
+                                capturing || recognizing
+                                  ? "text-slate-500"
+                                  : "text-slate-600"
+                              }`}
+                          >
+                            Capture multiple frames for accurate face recognition.
+                          </p>
+                        </div>
+                      </div>
+                    </Button>
 
-  {/* Stop Camera */}
-  <Button
-    variant="outline"
-    onClick={stopCamera}
-    disabled={capturing || recognizing}
-    className={`h-auto py-3 sm:py-4 px-4 sm:px-5 rounded-2xl text-sm md:text-base border transition-all duration-300
-      ${
-        capturing || recognizing
-          ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
-          : "border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400"
-      }`}
-  >
-    Stop Camera
-  </Button>
+                    <Button
+                      variant="outline"
+                      onClick={stopCamera}
+                      disabled={capturing || recognizing}
+                      className={`h-auto py-3 sm:py-4 px-4 sm:px-5 rounded-2xl text-xs sm:text-sm md:text-base border transition-all duration-300
+                        ${
+                          capturing || recognizing
+                            ? "border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed"
+                            : "border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400"
+                        }`}
+                    >
+                      Stop Camera
+                    </Button>
                   </>
                 ) : (
-                  <div className="text-xs md:text-sm text-slate-500">
-                    Click <span className="font-semibold">“Start Camera”</span> to
-                    begin capturing frames.
+                  <div className="text-xs sm:text-sm text-slate-500">
+                    Click <span className="font-semibold">“Start Camera”</span> to begin
+                    capturing frames.
                   </div>
                 )}
               </div>
 
+              {/* Captured frames preview + Run recognition */}
+              {capturedFrameUrls.length > 0 && (
+                <div className="mt-2 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs sm:text-sm font-semibold text-slate-700">
+                      Captured Frames
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-slate-500">
+                      Tap a frame to inspect before running recognition
+                    </p>
+                  </div>
+
+                  {/* Thumbnails row */}
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {capturedFrameUrls.map((url, idx) => {
+                      const isSelected = selectedFrameIndex === idx;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSelectedFrameIndex(idx)}
+                          className={`relative h-16 sm:h-20 aspect-video rounded-lg overflow-hidden border transition-all duration-150
+                            ${
+                              isSelected
+                                ? "border-indigo-500 ring-2 ring-indigo-200"
+                                : "border-slate-300 hover:border-slate-400"
+                            }`}
+                        >
+                          <img
+                            src={url}
+                            alt={`Captured frame ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 left-1 rounded-full bg-black/60 text-[10px] sm:text-[11px] text-white px-2 py-0.5">
+                            #{idx + 1}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Large preview */}
+                  {selectedFrameIndex !== null &&
+                    capturedFrameUrls[selectedFrameIndex] && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1">
+                          Previewing frame #{selectedFrameIndex + 1}
+                        </p>
+                        <div className="rounded-lg overflow-hidden border border-slate-200 max-h-auto">
+                          <img
+                            src={capturedFrameUrls[selectedFrameIndex]}
+                            alt={`Preview frame ${selectedFrameIndex + 1}`}
+                            className="w-full h-full object-contain bg-black"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Run recognition button */}
+                  <Button
+                    onClick={() => recognizeFaces(capturedFrames)}
+                    disabled={
+                      recognizing || capturedFrames.length === 0 || capturing
+                    }
+                    className={`w-full h-auto py-3 sm:py-3.5 text-sm md:text-base font-semibold rounded-2xl
+                      ${
+                        recognizing || capturedFrames.length === 0 || capturing
+                          ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                          : "bg-indigo-600 hover:bg-indigo-700 text-slate-900 shadow-[0_8px_22px_rgba(79,70,229,0.45)]"
+                      }`}
+                  >
+                    {recognizing
+                      ? "Running recognition..."
+                      : "Run Recognition on Captured Frames"}
+                  </Button>
+                </div>
+              )}
+
               {/* Instructions */}
               {!cameraActive && !recognitionResult && (
-                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs md:text-sm text-slate-700 space-y-2">
+                <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-[11px] sm:text-xs md:text-sm text-slate-700 space-y-2">
                   <div className="flex items-center gap-2 font-semibold">
                     <Brain size={14} className="text-indigo-500" />
                     <span>How to use camera-based attendance</span>
                   </div>
                   <ol className="list-decimal pl-4 space-y-1.5">
                     <li>Ensure students are trained (see trained count above).</li>
-                    <li>Click <strong>“Start Camera”</strong> and position students in view.</li>
-                    <li>Click <strong>“Start Capture”</strong> to capture 8 frames.</li>
-                    <li>Wait for recognition to finish and review the result.</li>
+                    <li>
+                      Click <strong>“Start Camera”</strong> and position students in view.
+                    </li>
+                    <li>
+                      Click <strong>“Start Capture”</strong> to capture 8 frames.
+                    </li>
+                    <li>Review the captured frames below the camera preview.</li>
+                    <li>
+                      Click <strong>“Run Recognition on Captured Frames”</strong>.
+                    </li>
                     <li>Submit attendance when you’re satisfied.</li>
                   </ol>
                   {untrainedStudents > 0 && (
-                    <div className="mt-2 px-3 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 text-[11px] md:text-xs">
+                    <div className="mt-2 px-3 py-2 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 text-[10px] sm:text-[11px] md:text-xs">
                       ⚠ {untrainedStudents} student(s) are not trained yet and will not be
                       recognized during capture.
                     </div>
@@ -823,15 +927,15 @@ export default function AttendanceCapturePage() {
 
           {/* Recognition & Submit Card */}
           <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <CardHeader className="pb-3 px-4 sm:px-5 pt-4 sm:pt-5">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg">
                 <Brain size={18} className="text-indigo-500" />
                 <span>Recognition Results</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 sm:px-5 pb-4 sm:pb-5">
               {!recognitionResult ? (
-                <p className="text-sm md:text-base text-slate-500">
+                <p className="text-sm text-slate-500">
                   Capture frames to see recognized students and their attendance.
                 </p>
               ) : (
@@ -839,26 +943,26 @@ export default function AttendanceCapturePage() {
                   {/* Stats */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                      <p className="text-[10px] sm:text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
                         Total Faces
                       </p>
-                      <p className="text-xl md:text-2xl font-bold text-slate-900 mt-1">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 mt-1">
                         {recognitionResult.totalFaces}
                       </p>
                     </div>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                      <p className="text-[11px] font-semibold tracking-wide text-emerald-700 uppercase">
+                      <p className="text-[10px] sm:text-[11px] font-semibold tracking-wide text-emerald-700 uppercase">
                         Recognized
                       </p>
-                      <p className="text-xl md:text-2xl font-bold text-emerald-800 mt-1">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-800 mt-1">
                         {recognitionResult.recognizedStudents.length}
                       </p>
                     </div>
                     <div className="rounded-xl border border-purple-200 bg-purple-50 p-3">
-                      <p className="text-[11px] font-semibold tracking-wide text-purple-700 uppercase">
+                      <p className="text-[10px] sm:text-[11px] font-semibold tracking-wide text-purple-700 uppercase">
                         Avg Confidence
                       </p>
-                      <p className="text-xl md:text-2xl font-bold text-purple-800 mt-1">
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-800 mt-1">
                         {(recognitionResult.averageConfidence * 100).toFixed(1)}%
                       </p>
                     </div>
@@ -902,11 +1006,12 @@ export default function AttendanceCapturePage() {
                   <Button
                     onClick={submitAttendance}
                     disabled={submitting}
-                    className={`w-full mt-2 text-sm md:text-base font-semibold ${
-                      submitting
-                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                        : "bg-indigo-600 hover:bg-indigo-700 text-green-400 shadow-[0_10px_25px_rgba(79,70,229,0.4)]"
-                    }`}
+                    className={`w-full mt-2 text-sm md:text-base font-semibold rounded-2xl
+                      ${
+                        submitting
+                          ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                          : "bg-indigo-600 hover:bg-indigo-700 text-green-400 shadow-[0_10px_25px_rgba(79,70,229,0.4)]"
+                      }`}
                   >
                     {submitting ? "Submitting..." : "✔ Submit Attendance"}
                   </Button>

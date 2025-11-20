@@ -11,7 +11,7 @@ interface AttendanceRecord {
   timestamp: string;
   course?: {
     name?: string;
-    entryCode?: string;
+    code?: string;
   };
 }
 
@@ -96,7 +96,7 @@ export default function AttendanceHistoryPage() {
 
     for (const r of records) {
       const name = r.course?.name || "Unknown Course";
-      const code = r.course?.entryCode || "N/A";
+      const code = r.course?.code || "N/A";
       const key = `${name}__${code}`;
       if (!map.has(key)) {
         map.set(key, { name, entryCode: code, total: 0, present: 0 });
@@ -121,7 +121,7 @@ export default function AttendanceHistoryPage() {
     const headers = ["Course", "Entry Code", "Status", "Date", "Time"];
     const rows = filteredRecords.map((r) => [
       r.course?.name || "N/A",
-      r.course?.entryCode || "N/A",
+      r.course?.code || "N/A",
       r.status ? "Present" : "Absent",
       new Date(r.timestamp).toLocaleDateString(),
       new Date(r.timestamp).toLocaleTimeString(),
@@ -498,7 +498,7 @@ export default function AttendanceHistoryPage() {
                               {record.course?.name || "N/A"}
                             </td>
                             <td className="px-6 py-4 text-slate-600 font-mono text-xs">
-                              {record.course?.entryCode || "N/A"}
+                              {record.course?.code || "N/A"}
                             </td>
                             <td className="px-6 py-4">
                               <span
@@ -551,7 +551,7 @@ export default function AttendanceHistoryPage() {
                             {record.course?.name || "N/A"}
                           </h3>
                           <p className="text-[11px] text-slate-500 font-mono">
-                            {record.course?.entryCode || "N/A"}
+                            {record.course?.code || "N/A"}
                           </p>
                         </div>
                         <span
