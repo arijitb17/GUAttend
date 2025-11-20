@@ -13,7 +13,8 @@ interface JWTPayload {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }   // ✅ params is NOT a Promise
+  // ✅ params is a Promise in Next 15 app router route handlers
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -43,8 +44,8 @@ export async function GET(
       );
     }
 
-    // ✅ Just read from params, no await
-    const { id: courseId } = params;
+    // ✅ Await the params Promise
+    const { id: courseId } = await params;
 
     // Verify student exists
     const student = await prisma.student.findUnique({
@@ -59,7 +60,7 @@ export async function GET(
       );
     }
 
-    // Fetch course details (includes code, entryCode already since it's the Course model)
+    // Fetch course details
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       include: {
