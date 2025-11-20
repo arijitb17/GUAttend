@@ -1,11 +1,10 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -41,11 +40,11 @@ model Student {
   userId          String    @unique
   program         Program   @relation(fields: [programId], references: [id])
   programId       String
-  faceEmbedding   Bytes?    // Store serialized face embedding
+  faceEmbedding   Bytes?
   courses         Course[]  @relation("CourseStudents")
   attendance      Attendance[]
-  joinedAt        DateTime  @default(now())      // When the student enrolled
-  status          String    @default("active")   // "active" | "graduated"
+  joinedAt        DateTime  @default(now())
+  status          String    @default("active")
 }
 
 model Department {
@@ -56,10 +55,10 @@ model Department {
 }
 
 model Program {
-  id           String         @id @default(cuid())
-  name         String
-  department   Department     @relation(fields: [departmentId], references: [id])
-  departmentId String
+  id            String       @id @default(cuid())
+  name          String
+  department    Department   @relation(fields: [departmentId], references: [id])
+  departmentId  String
   academicYears AcademicYear[]
   students      Student[]
 }
@@ -73,7 +72,7 @@ model AcademicYear {
 }
 
 model Semester {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   academicYearId String
@@ -81,26 +80,25 @@ model Semester {
 }
 
 model Course {
-  id             String      @id @default(cuid())
-  name           String
-  code           String      @unique 
-  entryCode      String      @unique
-  teacher        Teacher     @relation(fields: [teacherId], references: [id])
-  teacherId      String
-  semester       Semester    @relation(fields: [semesterId], references: [id])
-  semesterId     String
-  students       Student[]   @relation("CourseStudents")
-  attendance     Attendance[]
+  id         String      @id @default(cuid())
+  name       String
+  code       String      @unique
+  entryCode  String      @unique
+  teacher    Teacher     @relation(fields: [teacherId], references: [id])
+  teacherId  String
+  semester   Semester    @relation(fields: [semesterId], references: [id])
+  semesterId String
+  students   Student[]   @relation("CourseStudents")
+  attendance Attendance[]
 }
 
-
 model Attendance {
-  id         String    @id @default(cuid())
-  student    Student   @relation(fields: [studentId], references: [id])
-  studentId  String
-  course     Course    @relation(fields: [courseId], references: [id])
-  courseId   String
-  status     Boolean   @default(false)  // true = present, false = absent
-  timestamp  DateTime  @default(now())
-  photoPath  String?   // Optional path to attendance photo
+  id        String   @id @default(cuid())
+  student   Student  @relation(fields: [studentId], references: [id])
+  studentId String
+  course    Course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  status    Boolean  @default(false)
+  timestamp DateTime @default(now())
+  photoPath String?
 }
