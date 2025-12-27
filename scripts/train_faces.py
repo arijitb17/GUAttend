@@ -2,7 +2,13 @@
 import os
 import cv2
 import numpy as np
-import imgaug.augmenters as iaa
+# Use albumentations instead of imgaug for NumPy 2.0 compatibility
+try:
+    import albumentations as A
+    AUGMENTATION_AVAILABLE = True
+except ImportError:
+    AUGMENTATION_AVAILABLE = False
+    print("Warning: albumentations not installed. Augmentation will be skipped.")
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
@@ -68,7 +74,6 @@ def update_student_embedding(student_id, embedding_data):
         conn.commit()
         
         if cursor.rowcount > 0:
-            # FIX: Replaced Unicode Check Mark with [OK]
             print(f"  [OK] Database updated for {student_id}")
             return True
         else:
@@ -76,7 +81,6 @@ def update_student_embedding(student_id, embedding_data):
             return False
             
     except Exception as e:
-        # FIX: Replaced Unicode X Mark with [X]
         print(f"  [X] Database update failed for {student_id}: {e}")
         conn.rollback()
         return False
@@ -102,7 +106,6 @@ def main():
         print("\n[1/5] Initializing face recognition model...")
         app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
         app.prepare(ctx_id=0, det_size=(640, 640))
-        # FIX: Replaced Unicode Check Mark with [OK]
         print("  [OK] Model loaded successfully")
 
         # Storage
@@ -115,16 +118,19 @@ def main():
 
         # Enhanced augmentation pipeline
         print("\n[2/5] Setting up augmentation pipeline...")
-        augmenter = iaa.Sequential([
-            iaa.Fliplr(0.5),
-            iaa.Affine(rotate=(-15, 15)),
-            iaa.Multiply((0.8, 1.2)),
-            iaa.GammaContrast((0.7, 1.3)),
-            iaa.AdditiveGaussianNoise(scale=(0, 0.03*255)),
-            iaa.GaussianBlur(sigma=(0, 1.0)),
-        ])
-        # FIX: Replaced Unicode Check Mark with [OK]
-        print("  [OK] Augmentation ready")
+        augmenter = None
+        if AUGMENTATION_AVAILABLE:
+            augmenter = A.Compose([
+                A.HorizontalFlip(p=0.5),
+                A.Rotate(limit=15, p=0.8),
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.8),
+                A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=20, p=0.5),
+                A.GaussianBlur(blur_limit=(3, 5), p=0.3),
+                A.MultiplicativeNoise(multiplier=(0.9, 1.1), p=0.3),
+            ])
+            print("  [OK] Augmentation ready (albumentations)")
+        else:
+            print("  [!] Augmentation disabled (albumentations not installed)")
 
         print("\n[3/5] Processing student photos...")
         print("-" * 60)
@@ -176,23 +182,27 @@ def main():
                         labels.append(student_folder)
                         images_for_person += 1
 
-                    # Augmentation
-                    num_augmentations = min(3, max(1, 5 - len(image_files)))
-                    
-                    for aug_idx in range(num_augmentations):
-                        try:
-                            aug_img = augmenter.augment_image(img_rgb)
-                            faces_aug = app.get(aug_img)
-                            
-                            if len(faces_aug) > 0:
-                                face_aug = max(faces_aug, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-                                emb_aug = face_aug.normed_embedding
-                                person_embeddings.append(emb_aug)
-                                embedding_vectors.append(emb_aug)
-                                labels.append(student_folder)
+                    # Augmentation (only if augmenter is available)
+                    if augmenter is not None:
+                        num_augmentations = min(3, max(1, 5 - len(image_files)))
+                        
+                        for aug_idx in range(num_augmentations):
+                            try:
+                                # Apply albumentations augmentation
+                                augmented = augmenter(image=img_rgb)
+                                aug_img = augmented['image']
                                 
-                        except Exception as e:
-                            continue
+                                faces_aug = app.get(aug_img)
+                                
+                                if len(faces_aug) > 0:
+                                    face_aug = max(faces_aug, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+                                    emb_aug = face_aug.normed_embedding
+                                    person_embeddings.append(emb_aug)
+                                    embedding_vectors.append(emb_aug)
+                                    labels.append(student_folder)
+                                    
+                            except Exception as e:
+                                continue
 
                 except Exception as e:
                     print(f"  [!] Error processing {image_name}: {e}")
@@ -222,13 +232,12 @@ def main():
             sys.exit(1)
 
         if len(face_dict) < 2:
-            print("A Warning: Only one student trained. Add more students for better results.")
+            print("Warning: Only one student trained. Add more students for better results.")
 
         # Save embeddings
         print("\n[4/5] Saving embeddings...")
         with open(OUTPUT_FILE, "wb") as f:
             pickle.dump(face_dict, f)
-        # FIX: Replaced Unicode Check Mark with [OK]
         print(f"  [OK] Saved to '{OUTPUT_FILE}'")
 
         # Update database
@@ -238,7 +247,6 @@ def main():
             if update_student_embedding(student_id, embedding):
                 db_success_count += 1
         
-        # FIX: Replaced Unicode Check Mark with [OK]
         print(f"  [OK] Updated {db_success_count}/{len(face_dict)} records in database")
 
         # Summary
@@ -255,7 +263,6 @@ def main():
         if len(embedding_vectors) >= 4:
             print("\n[BONUS] Creating visualization...")
             create_enhanced_visualization(embedding_vectors, labels)
-            # FIX: Replaced Unicode Check Mark with [OK]
             print(f"  [OK] Saved to '{VISUALIZATION_PATH}'")
 
         # Quality assessment
@@ -342,13 +349,13 @@ def assess_training_quality(face_dict, labels):
             print(f"  Average Inter-student distance (L2): {avg_inter_distance:.3f}")
             
             if avg_inter_distance > 0.8:
-                print("  Quality: [★★★★★] EXCELLENT - Students well separated")
+                print("  Quality: [*****] EXCELLENT - Students well separated")
             elif avg_inter_distance > 0.6:
-                print("  Quality: [★★★★☆] GOOD - Students adequately separated")
+                print("  Quality: [****] GOOD - Students adequately separated")
             elif avg_inter_distance > 0.4:
-                print("  Quality: [★★★☆☆] FAIR - May have some confusion")
+                print("  Quality: [***] FAIR - May have some confusion")
             else:
-                print("  Quality: [★★☆☆☆] POOR - Add more diverse photos")
+                print("  Quality: [**] POOR - Add more diverse photos")
 
         label_counts = {}
         for label in labels:
@@ -361,13 +368,13 @@ def assess_training_quality(face_dict, labels):
         print(f"  Samples per student: {min_samples}-{max_samples} (avg: {avg_samples:.1f})")
         
         if min_samples >= 5:
-            print("  Sample size: [★★★★★] EXCELLENT")
+            print("  Sample size: [*****] EXCELLENT")
         elif min_samples >= 3:
-            print("  Sample size: [★★★★☆] GOOD") 
+            print("  Sample size: [****] GOOD") 
         elif min_samples >= 2:
-            print("  Sample size: [★★★☆☆] ACCEPTABLE")
+            print("  Sample size: [***] ACCEPTABLE")
         else:
-            print("  Sample size: [★★☆☆☆] POOR - Add more photos")
+            print("  Sample size: [**] POOR - Add more photos")
 
     except Exception as e:
         print(f"  [!] Quality assessment failed: {e}")

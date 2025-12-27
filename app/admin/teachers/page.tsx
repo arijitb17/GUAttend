@@ -242,7 +242,7 @@ export default function TeachersPage() {
                       <Button
                         variant="default"
                         size="sm"
-                        className="bg-slate-900 hover:bg-slate-800 text-xs sm:text-sm"
+                        className="bg-slate-900 hover:bg-slate-800 text-black text-xs sm:text-sm"
                         onClick={() => {
                           setActiveTeacherId(
                             activeTeacherId === t.id ? null : t.id
@@ -287,7 +287,7 @@ export default function TeachersPage() {
                       </div>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm text-black"
                         disabled={loading || !activeDepartmentId}
                         onClick={() => approveTeacher(t.id)}
                       >

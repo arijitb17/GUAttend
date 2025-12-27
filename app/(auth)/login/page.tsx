@@ -41,7 +41,7 @@ export default function HomePage() {
       {/* Left image section – narrower on tablet/desktop */}
       <div className="relative w-full h-56 sm:h-64 md:h-auto md:w-5/12 lg:w-1/2 overflow-hidden">
         <Image
-          src="/bg-left.png"
+          src="/bg.jpg"
           alt="Campus"
           fill
           priority

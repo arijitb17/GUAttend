@@ -135,50 +135,61 @@ export async function GET(request: NextRequest) {
         record.timestamp.toISOString().split("T")[0]
       )
     );
-    const totalSessions = allSessionDates.size;
+    const totalSessions = new Set(
+  attendanceRecords.map(
+    (r) => r.timestamp.toISOString()
+  )
+).size;
+
 
     console.log("Total unique sessions:", totalSessions);
 
     // Create a map for student statistics
-    const studentStatsMap = new Map<string, {
-      studentName: string;
-      studentEmail: string;
-      attended: number;
-    }>();
+    const studentStatsMap = new Map<
+  string,
+  {
+    studentName: string;
+    studentEmail: string;
+    attendedSessions: Set<string>;
+  }
+>();
 
-    // Initialize all enrolled students
-    course.students.forEach((student) => {
-      studentStatsMap.set(student.id, {
-        studentName: student.user.name,
-        studentEmail: student.user.email,
-        attended: 0,
-      });
-    });
+// Initialize students
+course.students.forEach((student) => {
+  studentStatsMap.set(student.id, {
+    studentName: student.user.name,
+    studentEmail: student.user.email,
+    attendedSessions: new Set(),
+  });
+});
 
-    // Count attendance for each student
-    attendanceRecords.forEach((record) => {
-      const stats = studentStatsMap.get(record.studentId);
-      if (stats && record.status === true) {
-        stats.attended += 1;
-      }
-    });
+// Fill attendance
+attendanceRecords.forEach((record) => {
+  if (record.status === true) {
+    const stats = studentStatsMap.get(record.studentId);
+    if (stats) {
+      stats.attendedSessions.add(record.timestamp.toISOString());
+    }
+  }
+});
 
     console.log("Student stats calculated");
 
     // Build the final report
     const report = Array.from(studentStatsMap.values()).map((stats) => {
-      const percentage = totalSessions > 0 
-        ? (stats.attended / totalSessions) * 100 
-        : 0;
-      
-      return {
-        studentName: stats.studentName,
-        studentEmail: stats.studentEmail,
-        totalSessions: totalSessions,
-        attended: stats.attended,
-        percentage: percentage,
-      };
-    });
+  const attended = stats.attendedSessions.size;
+  const percentage =
+    totalSessions > 0 ? (attended / totalSessions) * 100 : 0;
+
+  return {
+    studentName: stats.studentName,
+    studentEmail: stats.studentEmail,
+    totalSessions,
+    attended,
+    percentage: Number(percentage.toFixed(1)),
+  };
+});
+
 
     // Sort by name
     report.sort((a, b) => a.studentName.localeCompare(b.studentName));

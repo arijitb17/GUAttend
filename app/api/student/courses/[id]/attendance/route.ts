@@ -3,15 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
 
 interface JWTPayload {
   userId: string;
   role: string;
 }
 
-export async function GET(request: NextRequest, context: any) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -25,6 +35,9 @@ export async function GET(request: NextRequest, context: any) {
     let decoded: JWTPayload;
 
     try {
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not configured");
+      }
       decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
     } catch {
       return NextResponse.json(
@@ -40,9 +53,8 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    const { id: courseId } = context.params;
+    const { id: courseId } = await params;
 
-    // ✅ Verify student exists
     const student = await prisma.student.findUnique({
       where: { userId: decoded.userId },
       select: { id: true },
@@ -55,7 +67,6 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    // ✅ Check enrollment
     const enrollment = await prisma.course.findFirst({
       where: {
         id: courseId,
@@ -70,7 +81,7 @@ export async function GET(request: NextRequest, context: any) {
       );
     }
 
-    // ✅ Fetch attendance records (include course code & entryCode from DB)
+    // ✅ Fetch attendance records for THIS student
     const attendanceRecords = await prisma.attendance.findMany({
       where: { studentId: student.id, courseId },
       select: {
@@ -81,24 +92,56 @@ export async function GET(request: NextRequest, context: any) {
           select: {
             id: true,
             name: true,
-            code: true,       // ← from DB
-            entryCode: true,  // ← from DB (optional but useful)
+            code: true,
+            entryCode: true,
           },
         },
       },
       orderBy: { timestamp: "desc" },
     });
 
-    // ✅ Calculate stats
-    const totalSessions = attendanceRecords.length;
-    const attended = attendanceRecords.filter((r) => r.status).length;
+    // ✅ Get ALL attendance for the course (to calculate total sessions)
+    const allCourseAttendance = await prisma.attendance.findMany({
+      where: { courseId },
+      select: { timestamp: true, studentId: true, status: true },
+    });
+
+    // ✅ Calculate unique dates (sessions) - SAME LOGIC AS OTHER APIs
+    const uniqueDates = new Set(
+      allCourseAttendance.map(record => 
+        record.timestamp.toISOString().split('T')[0]
+      )
+    );
+    const totalSessions = uniqueDates.size;
+
+    // ✅ Calculate sessions student attended (deduplicate by date)
+    const studentAttendedDates = new Set(
+      allCourseAttendance
+        .filter(record => record.studentId === student.id && record.status === true)
+        .map(record => record.timestamp.toISOString().split('T')[0])
+    );
+    const attended = studentAttendedDates.size;
+
     const absent = totalSessions - attended;
-    const attendanceRate =
-      totalSessions > 0 ? (attended / totalSessions) * 100 : 0;
+    const attendanceRate = totalSessions > 0 ? (attended / totalSessions) * 100 : 0;
+
+    // ✅ Deduplicate records by date (keep one per day) - SAME LOGIC
+    const uniqueRecords = Array.from(
+      attendanceRecords
+        .reduce((map, record) => {
+          const dateKey = record.timestamp.toISOString().split('T')[0];
+          // Keep first occurrence for each date
+          if (!map.has(dateKey)) {
+            map.set(dateKey, record);
+          }
+          return map;
+        }, new Map())
+        .values()
+    );
 
     return NextResponse.json(
       {
-        records: attendanceRecords,
+        records: uniqueRecords,
         statistics: {
           totalSessions,
           attended,

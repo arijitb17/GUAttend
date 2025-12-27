@@ -1,49 +1,62 @@
 // app/api/teacher/courses/[id]/route.ts
-// Make sure this file is in: app/api/teacher/courses/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+
+/**
+ * Reuse Prisma client (important for Next.js dev + serverless)
+ */
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma__: PrismaClient | undefined;
+}
+
+const prisma =
+  globalThis.__prisma__ ??
+  new PrismaClient({
+    log: ["error"],
+  });
+
+if (!globalThis.__prisma__) {
+  globalThis.__prisma__ = prisma;
+}
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ courseId: string }> } // ✅ Next.js 15: params is a Promise
+  { params }: { params: Promise<{ courseId: string }> }
 ) {
   try {
+    /* -------------------------------------------------- */
+    /* AUTH                                                */
+    /* -------------------------------------------------- */
+
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7);
     let decoded: any;
 
     try {
       decoded = jwt.verify(token, JWT_SECRET);
-    } catch (err) {
-      return NextResponse.json(
-        { error: "Unauthorized - Invalid token" },
-        { status: 401 }
-      );
+    } catch {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     if (decoded.role !== "TEACHER") {
-      return NextResponse.json(
-        { error: "Forbidden - Teachers only" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // ✅ Await params in Next.js 15
     const { courseId } = await params;
 
-    // Fetch the teacher to verify they own this course
+    /* -------------------------------------------------- */
+    /* TEACHER CHECK                                       */
+    /* -------------------------------------------------- */
+
     const teacher = await prisma.teacher.findUnique({
       where: { userId: decoded.userId },
       select: { id: true },
@@ -51,12 +64,15 @@ export async function GET(
 
     if (!teacher) {
       return NextResponse.json(
-        { error: "Teacher profile not found" },
+        { error: "Teacher not found" },
         { status: 404 }
       );
     }
 
-    // Fetch course with all details
+    /* -------------------------------------------------- */
+    /* COURSE + RELATIONS                                  */
+    /* -------------------------------------------------- */
+
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -95,50 +111,13 @@ export async function GET(
               select: {
                 name: true,
                 department: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: {
-                attendance: {
-                  where: {
-                    courseId: courseId,
-                  },
+                  select: { name: true },
                 },
               },
             },
           },
           orderBy: {
-            user: {
-              name: "asc",
-            },
-          },
-        },
-        attendance: {
-          include: {
-            student: {
-              include: {
-                user: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            timestamp: "desc",
-          },
-          distinct: ['timestamp'], // Get unique attendance sessions
-          take: 50,
-        },
-        _count: {
-          select: {
-            students: true,
-            attendance: true, // This counts total attendance records
+            user: { name: "asc" },
           },
         },
       },
@@ -151,42 +130,91 @@ export async function GET(
       );
     }
 
-    // Verify the teacher owns this course
     if (course.teacherId !== teacher.id) {
       return NextResponse.json(
-        { error: "Forbidden - You don't have access to this course" },
+        { error: "Access denied" },
         { status: 403 }
       );
     }
 
-    // Calculate unique attendance sessions (by grouping timestamps)
+    /* -------------------------------------------------- */
+    /* TOTAL UNIQUE SESSIONS                                */
+    /* -------------------------------------------------- */
+
     const uniqueSessions = await prisma.attendance.groupBy({
-      by: ['timestamp'],
-      where: { courseId: courseId },
-      _count: true,
+      by: ["timestamp"],
+      where: { courseId },
     });
 
-    // Transform the data to include faceEmbedding as boolean
-    const transformedCourse = {
-      ...course,
-      students: course.students.map((student) => ({
-        ...student,
-        faceEmbedding: !!student.faceEmbedding,
-      })),
-      _count: {
-        ...course._count,
-        attendance: uniqueSessions.length, // Override with unique session count
-      },
-    };
+    const totalSessions = uniqueSessions.length;
 
-    return NextResponse.json(transformedCourse, { status: 200 });
+    /* -------------------------------------------------- */
+    /* STUDENT ATTENDANCE COUNTS (FIXED)                    */
+    /* -------------------------------------------------- */
+
+    const studentsWithAttendance = await Promise.all(
+      course.students.map(async (student) => {
+        // ✅ FIX: Count unique sessions attended, not total records
+        const attendedSessions = await prisma.attendance.groupBy({
+          by: ["timestamp"],
+          where: {
+            courseId,
+            studentId: student.id,
+            status: true,
+          },
+        });
+
+        return {
+          ...student,
+          faceEmbedding: !!student.faceEmbedding,
+          _count: {
+            attendance: attendedSessions.length, // ✅ Count unique sessions
+          },
+        };
+      })
+    );
+
+    /* -------------------------------------------------- */
+    /* RECENT SESSIONS (optional list)                      */
+    /* -------------------------------------------------- */
+
+    const recentSessions = await prisma.attendance.findMany({
+      where: { courseId },
+      select: {
+        id: true,
+        timestamp: true,
+        student: {
+          select: {
+            user: { select: { name: true } },
+          },
+        },
+        status: true,
+      },
+      orderBy: { timestamp: "desc" },
+      take: 50,
+    });
+
+    /* -------------------------------------------------- */
+    /* FINAL RESPONSE                                      */
+    /* -------------------------------------------------- */
+
+    return NextResponse.json(
+      {
+        ...course,
+        students: studentsWithAttendance,
+        attendance: recentSessions,
+        _count: {
+          students: course.students.length,
+          attendance: totalSessions, // ✅ CORRECT
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error("Error fetching course details:", error);
+    console.error("Teacher course detail error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

@@ -1,4 +1,6 @@
-// app/api/student/courses/route.ts
+// ============================================================
+// FILE 1: app/api/student/courses/route.ts
+// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -81,7 +83,6 @@ export async function GET(request: NextRequest) {
             _count: {
               select: {
                 students: true,
-                attendance: true
               }
             }
           }
@@ -96,7 +97,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(student.courses);
+    // ✅ FIX: Calculate unique sessions for each course
+    const coursesWithCorrectCounts = await Promise.all(
+      student.courses.map(async (course) => {
+        const uniqueSessions = await prisma.attendance.groupBy({
+          by: ["timestamp"],
+          where: { courseId: course.id },
+        });
+
+        return {
+          ...course,
+          _count: {
+            ...course._count,
+            attendance: uniqueSessions.length, // ✅ Unique sessions count
+          },
+        };
+      })
+    );
+
+    return NextResponse.json(coursesWithCorrectCounts);
   } catch (error) {
     console.error("Error fetching student courses:", error);
     return NextResponse.json(

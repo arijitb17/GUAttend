@@ -231,7 +231,9 @@ async function recognizeFaces(request: NextRequest) {
   const courseId = formData.get("courseId") as string;
   const batchId = formData.get("batchId") as string;
   const frames = formData.getAll("frames") as File[];
-  const autoSubmit = formData.get("autoSubmit") !== "false";
+  
+  // ✅ FIX: Change default to FALSE - only auto-submit when explicitly requested
+  const autoSubmit = formData.get("autoSubmit") === "true";
 
   if (!courseId || frames.length === 0) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -279,9 +281,11 @@ async function recognizeFaces(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    // Auto-submit attendance
+    // Auto-submit attendance ONLY if explicitly requested
     let attendanceResult = null;
     if (autoSubmit) {
+      console.log("🚀 Auto-submit is enabled, creating attendance records...");
+      
       const attendanceDate = new Date();
       const startOfDay = new Date(attendanceDate);
       startOfDay.setHours(0, 0, 0, 0);
@@ -349,6 +353,8 @@ async function recognizeFaces(request: NextRequest) {
           timestamp: r.timestamp,
         })),
       };
+    } else {
+      console.log("⏸️  Auto-submit is disabled, returning recognition results only");
     }
 
     return NextResponse.json({

@@ -3,8 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
 
 interface JWTPayload {
   userId: string;
@@ -13,7 +20,6 @@ interface JWTPayload {
 
 export async function GET(
   request: NextRequest,
-  // ✅ params is a Promise in Next 15 app router route handlers
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -29,6 +35,9 @@ export async function GET(
     let decoded: JWTPayload;
 
     try {
+      if (!JWT_SECRET) {
+        throw new Error("JWT_SECRET is not configured");
+      }
       decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
     } catch {
       return NextResponse.json(
@@ -44,10 +53,8 @@ export async function GET(
       );
     }
 
-    // ✅ Await the params Promise
     const { id: courseId } = await params;
 
-    // Verify student exists
     const student = await prisma.student.findUnique({
       where: { userId: decoded.userId },
       select: { id: true },
@@ -60,7 +67,6 @@ export async function GET(
       );
     }
 
-    // Fetch course details
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -79,7 +85,11 @@ export async function GET(
             },
           },
         },
-        _count: { select: { students: true, attendance: true } },
+        _count: { 
+          select: { 
+            students: true,
+          } 
+        },
         students: {
           where: { id: student.id },
           select: { id: true },
@@ -94,7 +104,6 @@ export async function GET(
       );
     }
 
-    // Check enrollment
     if (course.students.length === 0) {
       return NextResponse.json(
         { error: "You are not enrolled in this course" },
@@ -102,10 +111,31 @@ export async function GET(
       );
     }
 
-    // Exclude `students` before returning
+    // ✅ Calculate unique sessions (one per day) - SAME LOGIC AS OTHER APIs
+    const attendanceRecords = await prisma.attendance.findMany({
+      where: { courseId: course.id },
+      select: { timestamp: true },
+    });
+
+    // Deduplicate by date
+    const uniqueDates = new Set(
+      attendanceRecords.map(record => 
+        record.timestamp.toISOString().split('T')[0]
+      )
+    );
+
     const { students: _ignored, ...courseData } = course;
 
-    return NextResponse.json(courseData, { status: 200 });
+    return NextResponse.json(
+      {
+        ...courseData,
+        _count: {
+          ...courseData._count,
+          attendance: uniqueDates.size,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching course details:", error);
     return NextResponse.json(

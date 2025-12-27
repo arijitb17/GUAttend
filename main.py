@@ -14,7 +14,13 @@ import mediapipe as mp
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
-import imgaug.augmenters as iaa
+# Use albumentations instead of imgaug for NumPy 2.0 compatibility
+try:
+    import albumentations as A
+    AUGMENTATION_AVAILABLE = True
+except ImportError:
+    AUGMENTATION_AVAILABLE = False
+    print("Warning: albumentations not installed. Augmentation will be skipped.")
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 load_dotenv()
@@ -175,7 +181,7 @@ async def health_check():
     return {
         "status": "healthy",
         "api": "running",
-        "python_version": "3.10"
+        "python_version": "3.11"
     }
 
 @app.post("/api/process-student")
@@ -237,14 +243,15 @@ async def train_faces():
         embedding_vectors = []
         labels = []
 
-        augmenter = iaa.Sequential(
-            [
-                iaa.Fliplr(0.5),
-                iaa.Affine(rotate=(-15, 15)),
-                iaa.Multiply((0.8, 1.2)),
-                iaa.GammaContrast((0.7, 1.3)),
-            ]
-        )
+        # Initialize augmenter if albumentations is available
+        augmenter = None
+        if AUGMENTATION_AVAILABLE:
+            augmenter = A.Compose([
+                A.HorizontalFlip(p=0.5),
+                A.Rotate(limit=15, p=0.8),
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.8),
+                A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=20, p=0.5),
+            ])
 
         student_folders = [
             d
@@ -282,23 +289,26 @@ async def train_faces():
                         embedding_vectors.append(emb)
                         labels.append(student_folder)
 
-                # Augmentation
-                for _ in range(2):
-                    try:
-                        aug_img = augmenter.augment_image(img_rgb)
-                    except Exception:
-                        aug_img = img_rgb
-                    faces_aug = app_model.get(aug_img)
-                    if len(faces_aug) > 0:
-                        face_aug = max(
-                            faces_aug,
-                            key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
-                        )
-                        emb_aug = getattr(face_aug, "normed_embedding", None)
-                        if emb_aug is not None:
-                            person_embeddings.append(emb_aug)
-                            embedding_vectors.append(emb_aug)
-                            labels.append(student_folder)
+                # Augmentation (only if augmenter is available)
+                if augmenter is not None:
+                    for _ in range(2):
+                        try:
+                            # albumentations expects numpy array in RGB format
+                            augmented = augmenter(image=img_rgb)
+                            aug_img = augmented['image']
+                        except Exception:
+                            aug_img = img_rgb
+                        faces_aug = app_model.get(aug_img)
+                        if len(faces_aug) > 0:
+                            face_aug = max(
+                                faces_aug,
+                                key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+                            )
+                            emb_aug = getattr(face_aug, "normed_embedding", None)
+                            if emb_aug is not None:
+                                person_embeddings.append(emb_aug)
+                                embedding_vectors.append(emb_aug)
+                                labels.append(student_folder)
 
             if person_embeddings:
                 median_embedding = np.median(person_embeddings, axis=0)

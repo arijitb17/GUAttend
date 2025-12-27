@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
-import { Search, Upload } from "lucide-react";
+import { Search, Upload, X, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +50,14 @@ interface Program {
   };
 }
 
+interface Toast {
+  id: number;
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+  details?: string[];
+}
+
 export default function TeacherStudents() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -62,10 +70,21 @@ export default function TeacherStudents() {
   const [searchTerm, setSearchTerm] = useState("");
   const [importing, setImporting] = useState(false);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>("");
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const addToast = (type: Toast["type"], title: string, message: string, details?: string[]) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, type, title, message, details }]);
+    setTimeout(() => removeToast(id), 8000);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
 
   async function fetchData() {
     try {
@@ -143,26 +162,26 @@ export default function TeacherStudents() {
       const file = formData.get("file") as File;
 
       if (!courseId) {
-        alert("Please select a course before importing.");
+        addToast("error", "Course Required", "Please select a course before importing.");
         setImporting(false);
         return;
       }
 
       if (!programId) {
-        alert("Please select a program before importing.");
+        addToast("error", "Program Required", "Please select a program before importing.");
         setImporting(false);
         return;
       }
 
       if (!file) {
-        alert("Please select a file to import.");
+        addToast("error", "File Required", "Please select a file to import.");
         setImporting(false);
         return;
       }
 
       const token = localStorage.getItem("token");
       if (!token) {
-        alert("Authentication token not found. Please log in again.");
+        addToast("error", "Authentication Error", "Please log in again.");
         router.push("/login");
         return;
       }
@@ -209,8 +228,9 @@ export default function TeacherStudents() {
             formattedDob = `${year}-${month}-${day}`;
           }
         } else if (typeof dob === "string") {
-          if (dob.includes("/")) {
-            const parts = dob.split("/");
+          if (dob.includes("/") || dob.includes("-")) {
+            const separator = dob.includes("/") ? "/" : "-";
+            const parts = dob.split(separator);
             if (parts.length === 3) {
               let year = parts[2];
               if (year.length === 2) {
@@ -238,7 +258,7 @@ export default function TeacherStudents() {
       }
 
       if (studentsToImport.length === 0) {
-        alert("No valid student data found in the file.");
+        addToast("error", "No Valid Data", "No valid student data found in the file.");
         setImporting(false);
         return;
       }
@@ -269,22 +289,25 @@ export default function TeacherStudents() {
           body: JSON.stringify({ students: studentsToEmail }),
         });
 
-        let message = `✅ Import completed and emails sent!\n\n`;
-        message += `Successful: ${results.successful.length}\n`;
-        message += `Already enrolled: ${results.existing.length}\n`;
-        message += `Failed: ${results.failed.length}`;
-
+        const message = `Successfully imported ${results.successful.length} students. ${results.existing.length} already enrolled. ${results.failed.length} failed.`;
+        
+        const details: string[] = [];
         if (results.failed.length > 0) {
-          message += `\n\nFailed imports:\n`;
+          details.push("Failed imports:");
           results.failed.slice(0, 5).forEach((f: any) => {
-            message += `- ${f.email}: ${f.reason}\n`;
+            details.push(`${f.email}: ${f.reason}`);
           });
           if (results.failed.length > 5) {
-            message += `... and ${results.failed.length - 5} more`;
+            details.push(`... and ${results.failed.length - 5} more`);
           }
         }
 
-        alert(message);
+        addToast(
+          results.failed.length > 0 ? "info" : "success",
+          "Import Completed",
+          message,
+          details.length > 0 ? details : undefined
+        );
 
         if (formRef.current) {
           formRef.current.reset();
@@ -292,11 +315,11 @@ export default function TeacherStudents() {
 
         await fetchData();
       } else {
-        alert(`❌ Error: ${data.error || "Failed to import students"}`);
+        addToast("error", "Import Failed", data.error || "Failed to import students");
       }
     } catch (error: any) {
       console.error("Import error:", error);
-      alert("❌ Error: " + error.message);
+      addToast("error", "Import Error", error.message);
     } finally {
       setImporting(false);
     }
@@ -339,6 +362,90 @@ export default function TeacherStudents() {
 
   return (
     <div className="max-w-full mx-auto py-6 space-y-8 text-slate-900">
+      {/* Toast Container */}
+      <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-xl shadow-lg border-2 p-4 backdrop-blur-sm animate-in slide-in-from-right ${
+              toast.type === "success"
+                ? "bg-emerald-50/95 border-emerald-200"
+                : toast.type === "error"
+                ? "bg-rose-50/95 border-rose-200"
+                : "bg-blue-50/95 border-blue-200"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                {toast.type === "success" && (
+                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                )}
+                {toast.type === "error" && (
+                  <XCircle className="h-5 w-5 text-rose-600" />
+                )}
+                {toast.type === "info" && (
+                  <AlertCircle className="h-5 w-5 text-blue-600" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4
+                  className={`text-sm font-semibold mb-1 ${
+                    toast.type === "success"
+                      ? "text-emerald-900"
+                      : toast.type === "error"
+                      ? "text-rose-900"
+                      : "text-blue-900"
+                  }`}
+                >
+                  {toast.title}
+                </h4>
+                <p
+                  className={`text-sm ${
+                    toast.type === "success"
+                      ? "text-emerald-700"
+                      : toast.type === "error"
+                      ? "text-rose-700"
+                      : "text-blue-700"
+                  }`}
+                >
+                  {toast.message}
+                </p>
+                {toast.details && toast.details.length > 0 && (
+                  <div className="mt-2 text-xs space-y-0.5">
+                    {toast.details.map((detail, idx) => (
+                      <p
+                        key={idx}
+                        className={
+                          toast.type === "success"
+                            ? "text-emerald-600"
+                            : toast.type === "error"
+                            ? "text-rose-600"
+                            : "text-blue-600"
+                        }
+                      >
+                        {detail}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => removeToast(toast.id)}
+                className={`flex-shrink-0 rounded-lg p-1 transition-colors ${
+                  toast.type === "success"
+                    ? "hover:bg-emerald-100 text-emerald-600"
+                    : toast.type === "error"
+                    ? "hover:bg-rose-100 text-rose-600"
+                    : "hover:bg-blue-100 text-blue-600"
+                }`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
@@ -355,7 +462,7 @@ export default function TeacherStudents() {
         </div>
       </div>
 
-      {/* Import Students (single card now) */}
+      {/* Import Students */}
       <Card className="border border-slate-300 bg-white rounded-2xl shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
         <CardHeader className="flex flex-row items-center gap-3 pb-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.55)]">
@@ -376,7 +483,7 @@ export default function TeacherStudents() {
               </label>
               <p className="text-xs text-slate-500 mb-2">
                 Columns: <span className="font-mono">Name</span>,{" "}
-                <span className="font-mono">DOB (dd/mm/yyyy)</span>,{" "}
+                <span className="font-mono">DOB (dd/mm/yyyy or dd-mm-yyyy)</span>,{" "}
                 <span className="font-mono">Email (optional)</span>
               </p>
               <input

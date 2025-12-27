@@ -650,11 +650,14 @@ const StudentProfilePage: React.FC = () => {
           {previews[key] ? (
             <div className="space-y-2">
               <div className="relative">
-                <img
-                  src={previews[key] || ""}
-                  alt={label}
-                  className="w-full h-32 object-cover rounded-lg border border-slate-200"
-                />
+                <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+  <img
+    src={previews[key] || ""}
+    alt={label}
+    className="absolute inset-0 w-full h-full object-cover"
+  />
+</div>
+
                 <button
                   onClick={() => removePhoto(key)}
                   className="absolute top-2 right-2 rounded-full bg-slate-900 text-slate-900 text-xs px-1.5 py-0.5 hover:bg-black"

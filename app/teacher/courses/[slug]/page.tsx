@@ -253,15 +253,18 @@ export default function CourseDetailPage() {
   });
 
   const registeredCount = course?.students.filter((s) => s.faceEmbedding).length || 0;
-  const totalSessions = course?._count?.attendance || 0;
-  const attendanceRate =
-    course?.students.length && totalSessions > 0
-      ? Math.round(
-          (course.students.reduce((sum, s) => sum + s._count.attendance, 0) /
-            (course.students.length * totalSessions)) *
-            100
-        )
-      : 0;
+  const totalSessions = course?._count.attendance ?? 0;
+
+const attendanceRate =
+  course && totalSessions > 0
+    ? Math.round(
+        (course.students.reduce((sum, s) => sum + s._count.attendance, 0) /
+          (course.students.length * totalSessions)) *
+          100
+      )
+    : 0;
+
+
 
   if (loading) {
     return (

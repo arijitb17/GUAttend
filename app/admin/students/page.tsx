@@ -291,10 +291,6 @@ export default function StudentsPage() {
             <Upload className="w-4 h-4 text-emerald-500" />
             Export Data
           </Button>
-          <Button className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-slate-900 flex items-center gap-2 shadow-[0_8px_22px_rgba(15,23,42,0.45)]">
-            <UserPlus className="w-4 h-4 text-blue-500" />
-            Add Student
-          </Button>
         </div>
       </div>
 

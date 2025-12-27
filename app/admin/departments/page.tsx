@@ -206,7 +206,7 @@ export default function DepartmentsPage() {
                 <Button
                   onClick={addDepartment}
                   disabled={loading || !newDept.trim()}
-                  className="w-full sm:w-auto inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-600"
+                  className="w-full sm:w-auto inline-flex items-center text-black gap-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-600"
                 >
                   {loading ? (
                     <>
@@ -215,7 +215,7 @@ export default function DepartmentsPage() {
                     </>
                   ) : (
                     <>
-                      <Check className="w-4 h-4" />
+                      <Check className="w-4 h-4 text-green-500" />
                       Add
                     </>
                   )}
@@ -295,14 +295,6 @@ export default function DepartmentsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-slate-200 text-slate-800 hover:bg-slate-100 text-xs sm:text-sm"
-                      >
-                        <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        Edit
-                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

@@ -355,14 +355,6 @@ export default function ProgramsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-slate-200 text-slate-800 hover:bg-slate-100 text-xs sm:text-sm"
-                      >
-                        <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
                         onClick={() => deleteProgram(program.id, program.name)}
                         className="border-red-200 text-red-600 hover:bg-red-50 text-xs sm:text-sm"
                       >
