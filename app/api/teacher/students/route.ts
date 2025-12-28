@@ -72,12 +72,6 @@ export async function GET(req: NextRequest) {
                 entryCode: true,
               },
             },
-            _count: {
-              select: {
-                courses: true,
-                attendance: true,
-              },
-            },
           },
         },
       },
@@ -89,13 +83,38 @@ export async function GET(req: NextRequest) {
     for (const course of courses) {
       for (const student of course.students) {
         if (!studentMap.has(student.id)) {
+          // Count attendance ONLY for this teacher's courses
+          const attendanceCount = await prisma.attendance.count({
+            where: {
+              studentId: student.id,
+              course: {
+                teacherId: teacher.id, // ← FIX: Only count attendance in YOUR courses
+              },
+            },
+          });
+
+          // Count courses taught by this teacher
+          const coursesCount = await prisma.course.count({
+            where: {
+              teacherId: teacher.id,
+              students: {
+                some: {
+                  id: student.id,
+                },
+              },
+            },
+          });
+
           studentMap.set(student.id, {
             id: student.id,
             user: student.user,
             program: student.program,
             faceEmbedding: !!student.faceEmbedding,
             courses: student.courses, // Include courses array
-            _count: student._count,
+            _count: {
+              courses: coursesCount, // Only YOUR courses
+              attendance: attendanceCount, // Only attendance in YOUR courses
+            },
           });
         } else {
           // If student already exists, merge courses to avoid duplicates
