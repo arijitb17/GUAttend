@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -11,6 +11,8 @@ import {
   GraduationCap,
   PlayCircle,
   Sparkles,
+  Search,
+  X,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +63,15 @@ interface Student {
   faceEmbedding: Buffer | null;
   photoCount?: number;
   hasPhotos?: boolean;
+}
+
+interface FlattenedCourse extends Course {
+  departmentName: string;
+  programName: string;
+  academicYearName: string;
+  semesterName: string;
+  displayPath: string;
+  searchText: string;
 }
 
 /* ---------- Shared stat card styles ---------- */
@@ -136,62 +147,58 @@ export default function TeacherAttendance() {
   const [hierarchy, setHierarchy] = useState<Hierarchy | null>(null);
   const [loadingHierarchy, setLoadingHierarchy] = useState(true);
 
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-
-  const [filteredPrograms, setFilteredPrograms] = useState<Program[]>([]);
-  const [filteredAcademicYears, setFilteredAcademicYears] = useState<AcademicYear[]>([]);
-  const [filteredSemesters, setFilteredSemesters] = useState<Semester[]>([]);
-  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<FlattenedCourse | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [training, setTraining] = useState(false);
 
+  // Flatten all courses into a searchable list
+  const allCourses = useMemo(() => {
+    if (!hierarchy) return [];
+
+    const courses: FlattenedCourse[] = [];
+    
+    hierarchy.departments.forEach((dept) => {
+      dept.programs.forEach((program) => {
+        program.academicYears.forEach((year) => {
+          year.semesters.forEach((semester) => {
+            semester.courses.forEach((course, index) => {
+              const displayCode = buildDisplayCourseCode(dept.name, semester.name, index);
+              const displayPath = `${dept.name} → ${program.name} → ${year.name} → ${semester.name}`;
+              const searchText = `${course.name} ${displayCode} ${dept.name} ${program.name} ${year.name} ${semester.name}`.toLowerCase();
+              
+              courses.push({
+                ...course,
+                departmentName: dept.name,
+                programName: program.name,
+                academicYearName: year.name,
+                semesterName: semester.name,
+                displayPath,
+                searchText,
+              });
+            });
+          });
+        });
+      });
+    });
+
+    return courses;
+  }, [hierarchy]);
+
+  // Filter courses based on search
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery.trim()) return allCourses;
+    
+    const query = searchQuery.toLowerCase();
+    return allCourses.filter((course) => course.searchText.includes(query));
+  }, [allCourses, searchQuery]);
+
   useEffect(() => {
     fetchHierarchy();
   }, []);
-
-  useEffect(() => {
-    if (selectedDepartment && hierarchy) {
-      const dept = hierarchy.departments.find((d) => d.id === selectedDepartment);
-      setFilteredPrograms(dept?.programs || []);
-      setSelectedProgram("");
-      setSelectedAcademicYear("");
-      setSelectedSemester("");
-      setSelectedCourse(null);
-    }
-  }, [selectedDepartment, hierarchy]);
-
-  useEffect(() => {
-    if (selectedProgram) {
-      const program = filteredPrograms.find((p) => p.id === selectedProgram);
-      setFilteredAcademicYears(program?.academicYears || []);
-      setSelectedAcademicYear("");
-      setSelectedSemester("");
-      setSelectedCourse(null);
-    }
-  }, [selectedProgram, filteredPrograms]);
-
-  useEffect(() => {
-    if (selectedAcademicYear) {
-      const year = filteredAcademicYears.find((y) => y.id === selectedAcademicYear);
-      setFilteredSemesters(year?.semesters || []);
-      setSelectedSemester("");
-      setSelectedCourse(null);
-    }
-  }, [selectedAcademicYear, filteredAcademicYears]);
-
-  useEffect(() => {
-    if (selectedSemester) {
-      const semester = filteredSemesters.find((s) => s.id === selectedSemester);
-      setFilteredCourses(semester?.courses || []);
-      setSelectedCourse(null);
-    }
-  }, [selectedSemester, filteredSemesters]);
 
   async function fetchHierarchy() {
     setLoadingHierarchy(true);
@@ -282,8 +289,10 @@ export default function TeacherAttendance() {
     }
   }
 
-  function handleCourseSelect(course: Course) {
+  function handleCourseSelect(course: FlattenedCourse) {
     setSelectedCourse(course);
+    setSearchQuery("");
+    setShowDropdown(false);
     fetchCourseStudents(course.id);
   }
 
@@ -351,15 +360,8 @@ export default function TeacherAttendance() {
   }
 
   function resetSelection() {
-    setSelectedDepartment("");
-    setSelectedProgram("");
-    setSelectedAcademicYear("");
-    setSelectedSemester("");
     setSelectedCourse(null);
-    setFilteredPrograms([]);
-    setFilteredAcademicYears([]);
-    setFilteredSemesters([]);
-    setFilteredCourses([]);
+    setSearchQuery("");
     setStudents([]);
     setCurrentView("select");
   }
@@ -378,11 +380,6 @@ export default function TeacherAttendance() {
       </div>
     );
   }
-
-  const selectedDeptName =
-    hierarchy?.departments.find((d) => d.id === selectedDepartment)?.name || "";
-  const selectedSemName =
-    filteredSemesters.find((s) => s.id === selectedSemester)?.name || "";
 
   const statCards = [
     { title: "Total Students", value: students.length, icon: Users },
@@ -404,7 +401,7 @@ export default function TeacherAttendance() {
           </h1>
           <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
             {currentView === "select"
-              ? "Choose a course and get your AI attendance ready in a few clicks."
+              ? "Search and select your course to get started."
               : `Managing: ${selectedCourse?.name}`}
           </p>
         </div>
@@ -425,7 +422,7 @@ export default function TeacherAttendance() {
       {/* Course selection view */}
       {currentView === "select" && (
         <div className="grid gap-6 lg:grid-cols-[2fr,1.4fr]">
-          {/* Left: Course selection */}
+          {/* Left: Streamlined Course Search */}
           <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
             <CardHeader className="pb-4 px-4 sm:px-5 pt-4 sm:pt-5">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -433,121 +430,96 @@ export default function TeacherAttendance() {
                 <span>Select Course</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5 sm:space-y-6 px-4 sm:px-5 pb-4 sm:pb-5">
-              {/* Department */}
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2">
-                  1. Department
-                </label>
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                >
-                  <option value="">-- Choose Department --</option>
-                  {hierarchy?.departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Program */}
-              {selectedDepartment && filteredPrograms.length > 0 && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2">
-                    2. Program
-                  </label>
-                  <select
-                    value={selectedProgram}
-                    onChange={(e) => setSelectedProgram(e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                  >
-                    <option value="">-- Choose Program --</option>
-                    {filteredPrograms.map((prog) => (
-                      <option key={prog.id} value={prog.id}>
-                        {prog.name}
-                      </option>
-                    ))}
-                  </select>
+            <CardContent className="space-y-4 px-4 sm:px-5 pb-4 sm:pb-5">
+              {/* Search Input */}
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search by course name, code, department, program..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowDropdown(true);
+                    }}
+                    onFocus={() => setShowDropdown(true)}
+                    className="w-full pl-10 pr-10 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setShowDropdown(false);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
-              )}
 
-              {/* Academic Year */}
-              {selectedProgram && filteredAcademicYears.length > 0 && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2">
-                    3. Academic Year
-                  </label>
-                  <select
-                    value={selectedAcademicYear}
-                    onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                  >
-                    <option value="">-- Choose Academic Year --</option>
-                    {filteredAcademicYears.map((year) => (
-                      <option key={year.id} value={year.id}>
-                        {year.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Semester */}
-              {selectedAcademicYear && filteredSemesters.length > 0 && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-2">
-                    4. Semester
-                  </label>
-                  <select
-                    value={selectedSemester}
-                    onChange={(e) => setSelectedSemester(e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                  >
-                    <option value="">-- Choose Semester --</option>
-                    {filteredSemesters.map((sem) => (
-                      <option key={sem.id} value={sem.id}>
-                        {sem.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Courses */}
-              {selectedSemester && filteredCourses.length > 0 && (
-                <div className="space-y-3">
-                  <label className="block text-xs sm:text-sm font-medium text-slate-700 mb-1.5">
-                    5. Course
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    {filteredCourses.map((course, index) => {
+                {/* Dropdown Results */}
+                {showDropdown && filteredCourses.length > 0 && (
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                    {filteredCourses.slice(0, 20).map((course) => {
                       const displayCode = buildDisplayCourseCode(
-                        selectedDeptName,
-                        selectedSemName,
-                        index
+                        course.departmentName,
+                        course.semesterName,
+                        0
                       );
                       return (
                         <button
-                          type="button"
                           key={course.id}
                           onClick={() => handleCourseSelect(course)}
-                          className="text-left p-3.5 sm:p-4 rounded-md border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_10px_25px_rgba(15,23,42,0.08)] transition-all"
+                          className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-slate-100 last:border-b-0 transition-colors"
                         >
-                          <p className="text-[11px] sm:text-xs font-mono text-indigo-600 mb-1">
-                            {displayCode}
-                          </p>
-                          <p className="text-sm sm:text-base font-semibold text-slate-900">
-                            {course.name}
-                          </p>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-mono px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded">
+                                  {displayCode}
+                                </span>
+                                <span className="font-semibold text-slate-900 truncate">
+                                  {course.name}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 truncate">
+                                {course.displayPath}
+                              </p>
+                            </div>
+                          </div>
                         </button>
                       );
                     })}
+                    {filteredCourses.length > 20 && (
+                      <div className="px-4 py-2 text-xs text-slate-500 text-center bg-slate-50">
+                        Showing 20 of {filteredCourses.length} results. Keep typing to narrow down...
+                      </div>
+                    )}
                   </div>
+                )}
+
+                {showDropdown && searchQuery && filteredCourses.length === 0 && (
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center text-slate-500 text-sm">
+                    No courses found matching "{searchQuery}"
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <p className="text-xs text-slate-600 mb-1">Total Courses</p>
+                  <p className="text-2xl font-bold text-slate-900">{allCourses.length}</p>
                 </div>
-              )}
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <p className="text-xs text-slate-600 mb-1">Departments</p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {hierarchy?.departments.length || 0}
+                  </p>
+                </div>
+              </div>
 
               {loading && (
                 <div className="text-center pt-4">
@@ -570,7 +542,12 @@ export default function TeacherAttendance() {
             </CardHeader>
             <CardContent className="px-4 sm:px-5 pb-4 sm:pb-5">
               <ol className="list-decimal pl-5 space-y-2 text-xs sm:text-sm md:text-[15px] text-slate-700">
-                <li>Select your course using the filters on the left.</li>
+                <li>
+                  <strong>Search for your course</strong> using the smart search bar - type any part of the course name, code, or department.
+                </li>
+                <li>
+                  <strong>Select from results</strong> - courses appear instantly as you type.
+                </li>
                 <li>
                   Ensure students have uploaded photos so the model can recognize them.
                 </li>
@@ -578,19 +555,21 @@ export default function TeacherAttendance() {
                   Click <strong>Train Model</strong> to generate or update face embeddings.
                 </li>
                 <li>
-                  Once trained, use <strong>Capture Attendance</strong> to start a live
-                  recognition session.
-                </li>
-                <li>
-                  All attendance is automatically linked to this course for reporting.
+                  Once trained, use <strong>Capture Attendance</strong> to start a live recognition session.
                 </li>
               </ol>
+
+              <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <p className="text-xs text-indigo-900">
+                  <strong>💡 Pro Tip:</strong> You can search by course code (e.g., "IT-701"), course name, department, or any combination!
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Students view */}
+      {/* Students view - Same as before */}
       {currentView === "students" && selectedCourse && (
         <>
           {/* Top: stats + actions */}
@@ -710,7 +689,7 @@ export default function TeacherAttendance() {
                     </p>
                     <p className="mt-1">
                       Ensure photos are available and click{" "}
-                      <span className="font-semibold">“Train Model”</span> before capturing
+                      <span className="font-semibold">"Train Model"</span> before capturing
                       attendance.
                     </p>
                   </div>
@@ -730,24 +709,13 @@ export default function TeacherAttendance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-0 sm:px-4 pb-4 sm:pb-5">
-  {students.length === 0 ? (
-    <p className="text-slate-500 text-center py-8 text-sm sm:text-base px-4">
-      No students enrolled in this course.
-    </p>
-  ) : (
-    <div
-      className="
-        w-full 
-        max-w-full 
-        overflow-x-auto 
-        overflow-y-visible 
-        rounded-xl
-        scrollbar-thin 
-        scrollbar-thumb-gray-300 
-        scrollbar-track-transparent
-      "
-    >
-      <table className="min-w-max table-auto text-xs sm:text-sm">
+                {students.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8 text-sm sm:text-base px-4">
+                    No students enrolled in this course.
+                  </p>
+                ) : (
+                  <div className="w-full max-w-full overflow-x-auto overflow-y-visible rounded-xl scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                    <table className="min-w-max table-auto text-xs sm:text-sm">
                       <thead className="bg-slate-50 border-y border-slate-200">
                         <tr>
                           <th className="px-3 sm:px-4 md:px-5 py-3 text-left font-semibold text-slate-500">
@@ -841,19 +809,19 @@ export default function TeacherAttendance() {
                     <>
                       <li>Ensure each student has captured photos using your photo tool.</li>
                       <li>
-                        Click <span className="font-semibold">“Train Model”</span> to
+                        Click <span className="font-semibold">"Train Model"</span> to
                         generate embeddings.
                       </li>
                       <li>
                         After training, use{" "}
-                        <span className="font-semibold">“Capture Attendance”</span> to record
+                        <span className="font-semibold">"Capture Attendance"</span> to record
                         today&apos;s class.
                       </li>
                     </>
                   ) : (
                     <>
                       <li>
-                        Use the <span className="font-semibold">“Capture Attendance”</span>{" "}
+                        Use the <span className="font-semibold">"Capture Attendance"</span>{" "}
                         action to start a live session.
                       </li>
                       <li>Ask students to look at the camera for accurate detection.</li>

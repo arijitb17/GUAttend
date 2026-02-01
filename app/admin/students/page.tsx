@@ -413,57 +413,6 @@ export default function StudentsPage() {
             </Card>
           ))}
         </div>
-
-        {/* Program distribution mini chart */}
-        <Card className="border border-slate-200 bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-slate-700" />
-              Program Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            {programStats.length === 0 ? (
-              <p className="text-xs sm:text-sm text-slate-500">
-                No program enrollment data yet.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {programStats.map(({ program, count }) => {
-                  const percent =
-                    maxProgramCount === 0
-                      ? 0
-                      : Math.round((count / maxProgramCount) * 100);
-
-                  return (
-                    <div key={program.id}>
-                      <div className="flex justify-between text-xs text-slate-500 mb-1">
-                        <span className="truncate max-w-[60%]">
-                          {program.name}
-                          {program.department
-                            ? ` · ${program.department.name}`
-                            : ""}
-                        </span>
-                        <span>
-                          {count}{" "}
-                          <span className="text-[11px] text-slate-400">
-                            ({percent}%)
-                          </span>
-                        </span>
-                      </div>
-                      <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-sky-500 via-emerald-500 to-purple-500"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Students List */}

@@ -6,6 +6,8 @@ import * as XLSX from "xlsx";
 import { Search, Upload, X, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/lib/useToast";
+import { ToastContainer } from "@/components/Toast";
 
 interface StudentCourseRef {
   id: string;
@@ -50,14 +52,6 @@ interface Program {
   };
 }
 
-interface Toast {
-  id: number;
-  type: "success" | "error" | "info";
-  title: string;
-  message: string;
-  details?: string[];
-}
-
 export default function TeacherStudents() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -70,21 +64,13 @@ export default function TeacherStudents() {
   const [searchTerm, setSearchTerm] = useState("");
   const [importing, setImporting] = useState(false);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>("");
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  // Use the toast hook instead of manual state management
+  const { toasts, toast, removeToast } = useToast();
 
   useEffect(() => {
     fetchData();
   }, []);
-
-  const addToast = (type: Toast["type"], title: string, message: string, details?: string[]) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, type, title, message, details }]);
-    setTimeout(() => removeToast(id), 8000);
-  };
-
-  const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
 
   async function fetchData() {
     try {
@@ -162,26 +148,26 @@ export default function TeacherStudents() {
       const file = formData.get("file") as File;
 
       if (!courseId) {
-        addToast("error", "Course Required", "Please select a course before importing.");
+        toast.error("Course Required", "Please select a course before importing.");
         setImporting(false);
         return;
       }
 
       if (!programId) {
-        addToast("error", "Program Required", "Please select a program before importing.");
+        toast.error("Program Required", "Please select a program before importing.");
         setImporting(false);
         return;
       }
 
       if (!file) {
-        addToast("error", "File Required", "Please select a file to import.");
+        toast.error("File Required", "Please select a file to import.");
         setImporting(false);
         return;
       }
 
       const token = localStorage.getItem("token");
       if (!token) {
-        addToast("error", "Authentication Error", "Please log in again.");
+        toast.error("Authentication Error", "Please log in again.");
         router.push("/login");
         return;
       }
@@ -211,115 +197,80 @@ export default function TeacherStudents() {
           email ||
           `${String(name).toLowerCase().replace(/\s+/g, ".")}@student.com`;
 
-        let formattedDob = "";
-
+        let parsedDob: string;
         if (typeof dob === "number") {
-          if (dob > 31000) {
-            const date = XLSX.SSF.parse_date_code(dob);
-            formattedDob = `${date.y}-${String(date.m).padStart(
-              2,
-              "0"
-            )}-${String(date.d).padStart(2, "0")}`;
-          } else {
-            const dobStr = String(dob).padStart(6, "0");
-            const day = dobStr.substring(0, 2);
-            const month = dobStr.substring(2, 4);
-            const year = "20" + dobStr.substring(4, 6);
-            formattedDob = `${year}-${month}-${day}`;
-          }
-        } else if (typeof dob === "string") {
-          if (dob.includes("/") || dob.includes("-")) {
-            const separator = dob.includes("/") ? "/" : "-";
-            const parts = dob.split(separator);
-            if (parts.length === 3) {
-              let year = parts[2];
-              if (year.length === 2) {
-                year = "20" + year;
-              }
-              formattedDob = `${year}-${parts[1].padStart(
-                2,
-                "0"
-              )}-${parts[0].padStart(2, "0")}`;
+          const excelEpoch = new Date(1899, 11, 30);
+          const daysSinceEpoch = Math.floor(dob);
+          const date = new Date(excelEpoch);
+          date.setDate(excelEpoch.getDate() + daysSinceEpoch);
+          parsedDob = date.toISOString().split("T")[0];
+        } else {
+          let dateStr = String(dob).trim();
+          dateStr = dateStr.replace(/\//g, "-");
+          const parts = dateStr.split("-");
+          if (parts.length === 3) {
+            let [day, month, year] = parts;
+            if (year.length === 2) {
+              const currentYear = new Date().getFullYear();
+              const century = Math.floor(currentYear / 100) * 100;
+              year = String(century + parseInt(year, 10));
             }
-          } else if (dob.length === 6) {
-            const day = dob.substring(0, 2);
-            const month = dob.substring(2, 4);
-            const year = "20" + dob.substring(4, 6);
-            formattedDob = `${year}-${month}-${day}`;
+            parsedDob = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+          } else {
+            console.warn(`Skipping student ${name} - invalid DOB: ${dob}`);
+            continue;
           }
         }
 
         studentsToImport.push({
           name: String(name).trim(),
-          email: String(studentEmail).trim(),
-          dob: formattedDob,
+          email: studentEmail.toLowerCase().trim(),
+          dob: parsedDob,
           programId,
         });
       }
 
       if (studentsToImport.length === 0) {
-        addToast("error", "No Valid Data", "No valid student data found in the file.");
+        toast.warning("No Valid Data", "No valid student records found in the file.");
         setImporting(false);
         return;
       }
 
-      const res = await fetch(`/api/teacher/courses/${courseId}/import`, {
+      const response = await fetch("/api/teacher/students/import", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ students: studentsToImport }),
+        body: JSON.stringify({ students: studentsToImport, courseId }),
       });
 
-      const data = await res.json();
+      const result = await response.json();
 
-      if (res.ok) {
-        const { results } = data;
-
-        const studentsToEmail = studentsToImport.map((s) => ({
-          name: s.name,
-          email: s.email,
-          dob: s.dob,
-        }));
-
-        await fetch("/api/teacher/send-credentials", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ students: studentsToEmail }),
-        });
-
-        const message = `Successfully imported ${results.successful.length} students. ${results.existing.length} already enrolled. ${results.failed.length} failed.`;
-        
-        const details: string[] = [];
-        if (results.failed.length > 0) {
-          details.push("Failed imports:");
-          results.failed.slice(0, 5).forEach((f: any) => {
-            details.push(`${f.email}: ${f.reason}`);
-          });
-          if (results.failed.length > 5) {
-            details.push(`... and ${results.failed.length - 5} more`);
-          }
-        }
-
-        addToast(
-          results.failed.length > 0 ? "info" : "success",
-          "Import Completed",
-          message,
-          details.length > 0 ? details : undefined
-        );
-
-        if (formRef.current) {
-          formRef.current.reset();
-        }
-
-        await fetchData();
-      } else {
-        addToast("error", "Import Failed", data.error || "Failed to import students");
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to import students");
       }
-    } catch (error: any) {
-      console.error("Import error:", error);
-      addToast("error", "Import Error", error.message);
+
+      const { created, updated, enrolled, skipped, errors } = result;
+
+      toast.success(
+        "Import Successful!",
+        `Created: ${created}, Updated: ${updated}, Enrolled: ${enrolled}, Skipped: ${skipped}`
+      );
+
+      if (errors && errors.length > 0) {
+        toast.warning(
+          "Some Issues Occurred",
+          `${errors.length} student(s) had errors. Check console for details.`
+        );
+        console.error("Import errors:", errors);
+      }
+
+      await fetchData();
+      if (formRef.current) formRef.current.reset();
+    } catch (err: any) {
+      console.error("Import error:", err);
+      toast.error("Import Failed", err.message || "An error occurred during import");
     } finally {
       setImporting(false);
     }
@@ -327,10 +278,10 @@ export default function TeacherStudents() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[260px] text-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500 mx-auto" />
-          <p className="mt-3 text-sm text-slate-500">Loading students & courses…</p>
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent mb-4"></div>
+          <p className="text-sm text-slate-600 font-medium">Loading students...</p>
         </div>
       </div>
     );
@@ -338,21 +289,19 @@ export default function TeacherStudents() {
 
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[260px]">
-        <Card className="max-w-md border border-rose-200 bg-rose-50 rounded-2xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-rose-800 text-base">
-              Error Loading Students & Courses
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-rose-700">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4">
+        <Card className="max-w-md w-full border border-rose-200 bg-white rounded-2xl shadow-lg">
+          <CardContent className="py-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 mb-4">
+              <AlertCircle className="h-7 w-7 text-rose-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Error Loading Data</h3>
+            <p className="text-sm text-slate-600 mb-6">{error}</p>
             <Button
-              variant="outline"
               onClick={fetchData}
-              className="border-rose-300 text-rose-700 hover:bg-rose-100"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 py-2"
             >
-              Retry
+              Try Again
             </Button>
           </CardContent>
         </Card>
@@ -361,172 +310,138 @@ export default function TeacherStudents() {
   }
 
   return (
-    <div className="max-w-full mx-auto py-6 space-y-8 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 md:p-8">
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`rounded-xl shadow-lg border-2 p-4 backdrop-blur-sm animate-in slide-in-from-right ${
-              toast.type === "success"
-                ? "bg-emerald-50/95 border-emerald-200"
-                : toast.type === "error"
-                ? "bg-rose-50/95 border-rose-200"
-                : "bg-blue-50/95 border-blue-200"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                {toast.type === "success" && (
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                )}
-                {toast.type === "error" && (
-                  <XCircle className="h-5 w-5 text-rose-600" />
-                )}
-                {toast.type === "info" && (
-                  <AlertCircle className="h-5 w-5 text-blue-600" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4
-                  className={`text-sm font-semibold mb-1 ${
-                    toast.type === "success"
-                      ? "text-emerald-900"
-                      : toast.type === "error"
-                      ? "text-rose-900"
-                      : "text-blue-900"
-                  }`}
-                >
-                  {toast.title}
-                </h4>
-                <p
-                  className={`text-sm ${
-                    toast.type === "success"
-                      ? "text-emerald-700"
-                      : toast.type === "error"
-                      ? "text-rose-700"
-                      : "text-blue-700"
-                  }`}
-                >
-                  {toast.message}
-                </p>
-                {toast.details && toast.details.length > 0 && (
-                  <div className="mt-2 text-xs space-y-0.5">
-                    {toast.details.map((detail, idx) => (
-                      <p
-                        key={idx}
-                        className={
-                          toast.type === "success"
-                            ? "text-emerald-600"
-                            : toast.type === "error"
-                            ? "text-rose-600"
-                            : "text-blue-600"
-                        }
-                      >
-                        {detail}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => removeToast(toast.id)}
-                className={`flex-shrink-0 rounded-lg p-1 transition-colors ${
-                  toast.type === "success"
-                    ? "hover:bg-emerald-100 text-emerald-600"
-                    : toast.type === "error"
-                    ? "hover:bg-rose-100 text-rose-600"
-                    : "hover:bg-blue-100 text-blue-600"
-                }`}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight flex items-center gap-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.06)]">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white text-xl shadow-[0_4px_10px_rgba(0,0,0,0.35)]">
-              👩‍🏫
-            </span>
-            <span>Students & Courses</span>
-          </h1>
-          <p className="text-sm md:text-base text-slate-600 mt-1">
-            View your students, assign them to courses, and bulk-import new students from
-            Excel.
-          </p>
-        </div>
-      </div>
-
-      {/* Import Students */}
-      <Card className="border border-slate-300 bg-white rounded-2xl shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-        <CardHeader className="flex flex-row items-center gap-3 pb-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.55)]">
-            <Upload size={18} />
-          </div>
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base md:text-lg">Import Students</CardTitle>
-            <p className="text-xs md:text-[13px] text-slate-500 mt-0.5">
-              Upload an Excel file to create student accounts and enroll them into a course.
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+              Student Management
+            </h1>
+            <p className="text-sm md:text-base text-slate-500 mt-1">
+              Import, view, and manage your students
             </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <form ref={formRef} onSubmit={handleImport} className="space-y-4 text-sm">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                Excel File (.xlsx)
-              </label>
-              <p className="text-xs text-slate-500 mb-2">
-                Columns: <span className="font-mono">Name</span>,{" "}
-                <span className="font-mono">DOB (dd/mm/yyyy or dd-mm-yyyy)</span>,{" "}
-                <span className="font-mono">Email (optional)</span>
-              </p>
-              <input
-                type="file"
-                name="file"
-                accept=".xlsx,.xls"
-                required
-                disabled={importing}
-                className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
-              />
-            </div>
+        </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-sm">
+          <CardHeader className="flex flex-row items-center gap-3 pb-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.55)]">
+              <Upload size={18} />
+            </div>
+            <div>
+              <CardTitle className="text-base md:text-lg">Import Students</CardTitle>
+              <p className="text-xs md:text-[13px] text-slate-500 mt-0.5">
+                Upload an Excel file to create student accounts and enroll them into a course.
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <form ref={formRef} onSubmit={handleImport} className="space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Program
+                  Excel File (.xlsx)
                 </label>
-                <select
-                  name="programId"
+                <p className="text-xs text-slate-500 mb-2">
+                  Columns: <span className="font-mono">Name</span>,{" "}
+                  <span className="font-mono">DOB (dd/mm/yyyy or dd-mm-yyyy)</span>,{" "}
+                  <span className="font-mono">Email (optional)</span>
+                </p>
+                <input
+                  type="file"
+                  name="file"
+                  accept=".xlsx,.xls"
                   required
                   disabled={importing}
-                  className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
-                >
-                  <option value="">-- Select Program --</option>
-                  {programs.map((program) => (
-                    <option key={program.id} value={program.id}>
-                      {program.name} ({program.department.name})
-                    </option>
-                  ))}
-                </select>
+                  className="block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
+                />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Course
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    Program
+                  </label>
+                  <select
+                    name="programId"
+                    required
+                    disabled={importing}
+                    className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
+                  >
+                    <option value="">-- Select Program --</option>
+                    {programs.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.name} ({program.department.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    Course
+                  </label>
+                  <select
+                    name="courseId"
+                    required
+                    disabled={importing}
+                    className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
+                  >
+                    <option value="">-- Select Course --</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-slate-500">
+                  Newly imported students will receive login credentials by email.
+                </p>
+                <Button
+                  type="submit"
+                  disabled={importing}
+                  variant="outline"
+                  className="bg-slate-100 border border-slate-300 text-slate-900 text-sm px-4 py-2 rounded-xl hover:bg-slate-200 hover:border-slate-400 shadow-sm disabled:opacity-60 disabled:shadow-none"
+                >
+                  {importing ? "Importing…" : "Import Students"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Search + Course filter card */}
+        <Card className="border border-slate-200 bg-white rounded-2xl shadow-sm">
+          <CardContent className="py-3">
+            <div className="flex flex-col md:flex-row gap-3 md:items-center">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Search students by name, email, or program…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="w-full md:w-64">
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Filter by Course
                 </label>
                 <select
-                  name="courseId"
-                  required
-                  disabled={importing}
-                  className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
+                  value={selectedCourseFilter}
+                  onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
-                  <option value="">-- Select Course --</option>
+                  <option value="">All Courses</option>
                   {courses.map((course) => (
                     <option key={course.id} value={course.id}>
                       {course.name}
@@ -535,143 +450,92 @@ export default function TeacherStudents() {
                 </select>
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-slate-500">
-                Newly imported students will receive login credentials by email.
-              </p>
-              <Button
-                type="submit"
-                disabled={importing}
-                variant="outline"
-                className="bg-slate-100 border border-slate-300 text-slate-900 text-sm px-4 py-2 rounded-xl hover:bg-slate-200 hover:border-slate-400 shadow-sm disabled:opacity-60 disabled:shadow-none"
-              >
-                {importing ? "Importing…" : "Import Students"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Search + Course filter card */}
-      <Card className="border border-slate-200 bg-white rounded-2xl shadow-sm">
-        <CardContent className="py-3">
-          <div className="flex flex-col md:flex-row gap-3 md:items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search students by name, email, or program…"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                />
-              </div>
-            </div>
-            <div className="w-full md:w-64">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Filter by Course
-              </label>
-              <select
-                value={selectedCourseFilter}
-                onChange={(e) => setSelectedCourseFilter(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              >
-                <option value="">All Courses</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Students Table */}
-      <Card className="border border-slate-300 bg-white rounded-2xl shadow-[0_6px_18px_rgba(15,23,42,0.05)] overflow-hidden">
-        <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="text-base md:text-lg">Student Directory</CardTitle>
-        </CardHeader>
-
-        {courseFilteredStudents.length === 0 ? (
-          <CardContent className="py-8 text-center text-sm">
-            <span className="text-4xl mb-3 block">👨‍🎓</span>
-            <p className="font-medium text-slate-700 mb-1">No Students Found</p>
-            <p className="text-slate-500">
-              {searchTerm || selectedCourseFilter
-                ? "Try adjusting the search or course filter."
-                : "No students enrolled in your courses yet."}
-            </p>
           </CardContent>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  {[
-                    "Student",
-                    "Program",
-                    "Department",
-                    "Courses",
-                    "Attendance",
-                    "Face Data",
-                  ].map((head) => (
-                    <th
-                      key={head}
-                      className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
-                    >
-                      {head}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {courseFilteredStudents.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="hover:bg-slate-50/70 transition-colors"
-                  >
-                    <td className="px-6 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {student.user.name}
-                        </p>
-                        <p className="text-xs text-slate-500">{student.user.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-slate-700">
-                      {student.program.name}
-                    </td>
-                    <td className="px-6 py-3 text-slate-700">
-                      {student.program.department.name}
-                    </td>
-                    <td className="px-6 py-3 text-slate-700">
-                      {student._count.courses}
-                    </td>
-                    <td className="px-6 py-3 text-slate-700">
-                      {student._count.attendance}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                          student.faceEmbedding
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                        }`}
+        </Card>
+
+        {/* Students Table */}
+        <Card className="border border-slate-300 bg-white rounded-2xl shadow-[0_6px_18px_rgba(15,23,42,0.05)] overflow-hidden">
+          <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-base md:text-lg">Student Directory</CardTitle>
+          </CardHeader>
+
+          {courseFilteredStudents.length === 0 ? (
+            <CardContent className="py-8 text-center text-sm">
+              <span className="text-4xl mb-3 block">👨‍🎓</span>
+              <p className="font-medium text-slate-700 mb-1">No Students Found</p>
+              <p className="text-slate-500">
+                {searchTerm || selectedCourseFilter
+                  ? "Try adjusting the search or course filter."
+                  : "No students enrolled in your courses yet."}
+              </p>
+            </CardContent>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    {[
+                      "Student",
+                      "Program",
+                      "Department",
+                      "Courses",
+                      "Attendance",
+                      "Face Data",
+                    ].map((head) => (
+                      <th
+                        key={head}
+                        className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
                       >
-                        {student.faceEmbedding ? "✓ Registered" : "✗ Missing"}
-                      </span>
-                    </td>
+                        {head}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {courseFilteredStudents.map((student) => (
+                    <tr
+                      key={student.id}
+                      className="hover:bg-slate-50/70 transition-colors"
+                    >
+                      <td className="px-6 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {student.user.name}
+                          </p>
+                          <p className="text-xs text-slate-500">{student.user.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-slate-700">
+                        {student.program.name}
+                      </td>
+                      <td className="px-6 py-3 text-slate-700">
+                        {student.program.department.name}
+                      </td>
+                      <td className="px-6 py-3 text-slate-700">
+                        {student._count.courses}
+                      </td>
+                      <td className="px-6 py-3 text-slate-700">
+                        {student._count.attendance}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            student.faceEmbedding
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
+                          }`}
+                        >
+                          {student.faceEmbedding ? "✓ Registered" : "✗ Missing"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

@@ -26,7 +26,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 load_dotenv()
 
 app = FastAPI(title="Face Recognition API")
-
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,

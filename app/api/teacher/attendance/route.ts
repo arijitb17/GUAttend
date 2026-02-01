@@ -243,7 +243,17 @@ async function recognizeFaces(request: NextRequest) {
     // Forward to Python API
     const pythonFormData = new FormData();
     pythonFormData.append("courseId", courseId);
-    frames.forEach((frame) => pythonFormData.append("frames", frame));
+    for (const frame of frames) {
+  const arrayBuffer = await frame.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  pythonFormData.append(
+    "frames",
+    new Blob([buffer]),
+    frame.name || "frame.jpg"
+  );
+}
+
 
     const response = await fetch(`${PYTHON_API_URL}/api/recognize`, {
       method: "POST",

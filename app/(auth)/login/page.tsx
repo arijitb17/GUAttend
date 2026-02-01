@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/lib/useToast";
+import { ToastContainer } from "@/components/Toast";
 
 export default function HomePage() {
   const router = useRouter();
@@ -11,6 +13,8 @@ export default function HomePage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const { toasts, toast, removeToast } = useToast();
 
   async function handleLogin(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -22,131 +26,163 @@ export default function HomePage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Login failed");
+      
+      if (!res.ok) {
+        toast.error("Login Failed", data?.error || "Invalid credentials. Please try again.");
+        throw new Error(data?.error || "Login failed");
+      }
+      
       localStorage.setItem("token", data.token ?? "");
+      toast.success("Login Successful!", `Welcome back! Redirecting to your dashboard...`);
 
-      if (data.role === "ADMIN") router.push("/admin");
-      else if (data.role === "TEACHER") router.push("/teacher");
-      else if (data.role === "STUDENT") router.push("/student");
-      else router.push("/");
+      setTimeout(() => {
+        if (data.role === "ADMIN") router.push("/admin");
+        else if (data.role === "TEACHER") router.push("/teacher");
+        else if (data.role === "STUDENT") router.push("/student");
+        else router.push("/");
+      }, 1000);
+      
     } catch (err: any) {
-      alert(err.message || "Login error");
+      console.error("Login error:", err);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white">
-      {/* Left image section – narrower on tablet/desktop */}
-      <div className="relative w-full h-56 sm:h-64 md:h-auto md:w-5/12 lg:w-1/2 overflow-hidden">
-        <Image
-          src="/bg.jpg"
-          alt="Campus"
-          fill
-          priority
-          className="object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-black/40 to-black/10" />
-      </div>
+    <>
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            background-position: -200% center;
+          }
+          100% {
+            background-position: 200% center;
+          }
+        }
 
-      {/* Right login panel – wider on tablet/desktop */}
-      <div className="flex-1 flex items-center justify-center md:w-7/12 lg:w-1/2 px-3 sm:px-5 md:px-8 py-8 md:py-10">
-        <div className="w-full flex flex-col items-center text-center">
+        .ai-badge {
+          background: linear-gradient(
+            90deg,
+            rgba(59, 130, 246, 0.1) 0%,
+            rgba(147, 51, 234, 0.15) 50%,
+            rgba(59, 130, 246, 0.1) 100%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 3s ease-in-out infinite;
+        }
+
+        .ai-icon {
+          filter: drop-shadow(0 0 8px rgba(147, 51, 234, 0.3));
+        }
+      `}</style>
+
+      <div className="min-h-screen flex flex-col md:flex-row bg-white/90">
+        <ToastContainer toasts={toasts} onClose={removeToast} />
+        
+        {/* Left image section */}
+        <div className="relative w-full h-56 sm:h-64 md:h-auto md:w-5/12 lg:w-1/2 overflow-hidden">
           <Image
-            src="/logo.png"
-            alt="University Logo"
-            width={90}
-            height={90}
-            className="mb-4"
+            src="/bg.jpg"
+            alt="Campus"
+            fill
+            priority
+            className="object-cover object-center"
           />
+          <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-black/40 to-black/10" />
+        </div>
 
-          {/* Department name – ALWAYS one line */}
-          <h3
-            className="
-              font-semibold text-black leading-tight tracking-tight
-              whitespace-nowrap
-              text-[3.4vw]      /* very small screens */
-              sm:text-xl       /* phones ≥640px */
-              lg:text-3xl       /* large screens */
-            "
-          >
-            Department of Information Technology
-          </h3>
-
-          {/* Subtitle – ALWAYS one line */}
-          <p
-            className="
-              mt-1 text-black opacity-80 leading-snug tracking-tight
-              whitespace-nowrap
-              text-[2.9vw]      /* very small screens */
-              sm:text-sm
-              lg:text-lg
-            "
-          >
-            GUAttend — Gauhati University&apos;s Smart Attendance System
-          </p>
-
-          {/* Login form – width limited, text area not */}
-          <form
-            onSubmit={handleLogin}
-            className="mt-6 w-full max-w-md bg-white rounded-xl p-6 shadow-md border border-gray-200"
-          >
-            <div className="space-y-4">
-              <div className="space-y-1 text-left">
-                <label className="text-sm font-medium">Email</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
-                />
+        {/* Right login panel */}
+        <div className="flex-1 flex items-center justify-center md:w-7/12 lg:w-1/2 px-3 sm:px-5 md:px-8 py-8 md:py-10">
+          <div className="w-full flex flex-col items-center text-center">
+            {/* Facidence Logo with AI badge */}
+            <div className="relative mb-4">
+              <Image
+                src="/facidence.png"
+                alt="Facidence Logo"
+                width={110}
+                height={110}
+                className="mb-2"
+              />
+              
+              {/* AI-Powered Badge */}
+              <div className="ai-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-purple-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                <Sparkles size={14} className="text-purple-600 ai-icon" />
+                <span className="text-xs font-semibold text-purple-700">AI-Powered</span>
               </div>
-
-              <div className="space-y-1 text-left">
-                <label className="text-sm font-medium">Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full px-4 py-3 pr-11 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="custom-btn w-full mt-2 py-3 rounded-lg font-semibold bg-black text-white hover:bg-blue-500 transition disabled:opacity-60"
-              >
-                {loading ? "Logging in..." : "Log In"}
-              </button>
             </div>
-          </form>
 
-          <p className="text-sm text-gray-600 mt-5">
-            New to the Department?{" "}
-            <span
-              className="text-blue-600 underline cursor-pointer"
-              onClick={() => router.push("/register-teacher")}
+            {/* Department name */}
+            <h3 className="font-semibold text-black leading-tight tracking-tight whitespace-nowrap text-[3.4vw] sm:text-xl lg:text-3xl">
+              Department of Information Technology
+            </h3>
+
+            {/* Subtitle with AI mention */}
+            <p className="mt-1 text-black opacity-80 leading-snug tracking-tight whitespace-nowrap text-[2.9vw] sm:text-sm lg:text-lg">
+              GUAttend – AI-Powered Smart Attendance System
+            </p>
+
+            {/* Login form */}
+            <form
+              onSubmit={handleLogin}
+              className="mt-6 w-full max-w-md bg-white rounded-xl p-6 shadow-md border border-gray-200"
             >
-              Register here
-            </span>
-          </p>
+              <div className="space-y-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-sm font-medium">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-sm font-medium">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                      className="w-full px-4 py-3 pr-11 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black/70 focus:border-black outline-none text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="custom-btn w-full mt-2 py-3 rounded-lg font-semibold bg-black text-white hover:bg-blue-500 transition disabled:opacity-60"
+                >
+                  {loading ? "Logging in..." : "Log In"}
+                </button>
+              </div>
+            </form>
+
+            <p className="text-sm text-gray-600 mt-5">
+              New to the Department?{" "}
+              <span
+                className="text-blue-600 underline cursor-pointer"
+                onClick={() => router.push("/register-teacher")}
+              >
+                Register here
+              </span>
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
